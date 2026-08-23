@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..preprocessing.common import DatasetGroups
+from ..dataset import GroupedDataset
 
 # Shared constants
 SPLIT_NAMES: tuple[str, ...] = ("train", "val", "test")
@@ -50,7 +50,7 @@ class Optimizer(ABC):
 
     def __init__(
         self,
-        data: DatasetGroups,
+        data: GroupedDataset,
         ratios: tuple[float, ...] = (0.70, 0.15, 0.15),
         max_evals: int = 300_000,
         seed: int | None = None,
@@ -117,26 +117,3 @@ class Optimizer(ABC):
         """Weighted MAPE: sum_{s,c} w_c * |actual-target| / (target + eps)."""
         rel_err = np.abs(actual - self._target) / (self._target + eps)
         return float((self._weights * rel_err).sum())
-
-
-# Standalone helper for scoring external baselines (e.g. sklearn splitters)
-def evaluate_assignment(
-    data: DatasetGroups,
-    assignment: np.ndarray,
-    ratios: tuple[float, ...] = (0.70, 0.15, 0.15),
-    eps: float = 1.0,
-) -> float:
-    """Score an externally produced assignment with the shared cost function."""
-    ratios_ = np.asarray(ratios, dtype=np.float64)
-    counts = data.global_class_counts.astype(np.float64)
-    weights = counts.sum() / (data.n_classes * counts + 1e-6)
-    target = counts[np.newaxis, :] * ratios_[:, np.newaxis]
-
-    actual = np.zeros((N_SPLITS, data.n_classes), dtype=np.float64)
-    for s in range(N_SPLITS):
-        mask = assignment == s
-        if mask.any():
-            actual[s] = data.group_vectors[mask].sum(axis=0)
-
-    rel_err = np.abs(actual - target) / (target + eps)
-    return float((weights * rel_err).sum())
