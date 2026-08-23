@@ -8,6 +8,7 @@ import glob
 import io
 import os
 import sys
+import time
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
@@ -16,7 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-from splitkit import GroupedDataset
+from splitkit import Budget, GroupedDataset, SplitProblem
 from splitkit.io import load_npz
 from splitkit.strategies import (
     DifferentialEvolution,
@@ -34,7 +35,7 @@ _OPTIMIZERS = [
     ("SA", SimulatedAnnealing, dict(initial_temp=100.0, cooling_rate=0.9999, min_temp=1e-4)),
     ("DE", DifferentialEvolution, dict(strategy="DE/best/2/exp", pop_size=50, f_weight=0.9, crossover_prob=0.5)),
     ("RS", RandomSearch, dict()),
-    ("SGKF", SGKFBaseline, dict(max_evals=1)),
+    ("SGKF", SGKFBaseline, dict()),
 ]
 
 _STYLE = {
@@ -60,6 +61,8 @@ def _result_folder(name: str) -> str:
 def run_one(dataset_name: str) -> tuple[GroupedDataset, dict]:
     """Runs all optimizers across all seeds for a single dataset."""
     data = load_npz(_DATASET_PATHS[dataset_name])
+    # Weights and targets are shared by every strategy, so build the problem once.
+    problem = SplitProblem.build(data, RATIOS)
     results = {}
 
     for label, cls, kwargs in _OPTIMIZERS:
@@ -69,21 +72,19 @@ def run_one(dataset_name: str) -> tuple[GroupedDataset, dict]:
 
         # SGKF is deterministic
         runs_to_do = 1 if label == "SGKF" else N_RUNS
+        budget = Budget(max_evals=1 if label == "SGKF" else MAX_EVALS)
 
         for idx in range(runs_to_do):
             seed = SEEDS[idx]
-            opt = cls(
-                data=data,
-                ratios=RATIOS,
-                max_evals=kwargs.get("max_evals", MAX_EVALS),
-                seed=seed,
-                **{k: v for k, v in kwargs.items() if k != "max_evals"}
-            )
-            res = opt.optimize(verbose=False)
+            strategy = cls(**kwargs)
+
+            t0 = time.perf_counter()
+            res = strategy.run(problem, budget, np.random.default_rng(seed))
+            elapsed = time.perf_counter() - t0
 
             costs.append(res.cost)
             histories.append(res)
-            times.append(res.elapsed_time)
+            times.append(elapsed)
 
         mean_cost = np.mean(costs)
         std_cost = np.std(costs) if len(costs) > 1 else 0.0

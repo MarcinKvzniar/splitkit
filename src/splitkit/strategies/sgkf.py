@@ -1,34 +1,62 @@
-"""StratifiedGroupKFold baseline optimizer."""
+"""scikit-learn StratifiedGroupKFold reference baseline."""
 
-import time
+from __future__ import annotations
 
 import numpy as np
 
-from .base import Optimizer, SplitResult
+from ..problem import Budget, SplitProblem
+from .base import Outcome, Strategy
+from .registry import register_strategy
+
+__all__ = ["SGKFBaseline", "largest_remainder"]
+
+#: Cap on the synthetic item table handed to scikit-learn.
+_MAX_MATERIALIZED_ITEMS = 300_000
 
 
-class SGKFBaseline(Optimizer):
-    """Scikit-Learn StratifiedGroupKFold baseline.
+def largest_remainder(ratios: np.ndarray, total: int) -> list[int]:
+    """Apportion ``total`` indivisible units across ``ratios``.
 
-    Because SGKF creates K equally-sized folds, this wrapper over-splits
-    using K=20 (if possible) and groups the resulting folds to approximate
-    the target ratios (e.g., 14 folds for 70%, 3 for 15%, 3 for 15%).
+    Rounds down, then hands the remaining units to the largest fractional parts.
+    Unlike repeatedly nudging the single largest ratio, this cannot starve a split
+    of its share, and it stays correct for any number of splits.
+    """
+    exact = ratios * total
+    base = np.floor(exact).astype(int)
+    remainder = total - int(base.sum())
+    if remainder > 0:
+        order = np.argsort(-(exact - base))
+        base[order[:remainder]] += 1
+    return base.tolist()
+
+
+@register_strategy
+class SGKFBaseline(Strategy):
+    """Wraps scikit-learn's ``StratifiedGroupKFold`` as a comparison baseline.
+
+    scikit-learn produces equally sized folds, so this over-splits into up to 20
+    folds and then bins them to approximate the requested ratios.
+
+    Kept for benchmark comparability only. It is slow (it must materialise a
+    synthetic per-item table to call scikit-learn at all) and, above the item cap,
+    it downscales the counts -- which quietly changes the problem being solved.
+    A count-matrix-native reimplementation supersedes it.
     """
 
-    def __init__(
-        self,
-        data,
-        ratios: tuple[float, ...] = (0.70, 0.15, 0.15),
-        max_evals: int = 1,
-        seed: int | None = None,
-    ) -> None:
-        super().__init__(data, ratios, max_evals=max_evals, seed=seed)
+    name = "sgkf"
+    deterministic = False
+    requires = ("sklearn",)
 
-    def optimize(
+    def __init__(self, max_folds: int = 20) -> None:
+        self.max_folds = max_folds
+
+    def run(
         self,
-        verbose: bool = True,
-        log_interval: int = 10_000,
-    ) -> SplitResult:
+        problem: SplitProblem,
+        budget: Budget,
+        rng: np.random.Generator,
+        warm_start: np.ndarray | None = None,
+    ) -> Outcome:
         try:
             from sklearn.model_selection import StratifiedGroupKFold
         except ImportError as exc:  # pragma: no cover - exercised via extras
@@ -37,20 +65,20 @@ class SGKFBaseline(Optimizer):
                 "Install it with: pip install 'splitkit[sklearn]'"
             ) from exc
 
-        t_start = time.perf_counter()
+        data = problem.data
+        k = problem.n_splits
 
-        y_list = []
-        groups_list = []
-
-        total_counts = self.data.group_vectors.sum()
+        # scikit-learn needs per-item labels, so rebuild an item table from counts.
+        total_counts = data.group_vectors.sum()
         scale = 1.0
-        if total_counts > 300_000:
-            scale = 300_000 / total_counts
+        if total_counts > _MAX_MATERIALIZED_ITEMS:
+            scale = _MAX_MATERIALIZED_ITEMS / total_counts
 
-        for g_idx in range(self.data.n_groups):
-            for c_idx in range(self.data.n_classes):
-                raw_count = self.data.group_vectors[g_idx, c_idx]
-                count = round(raw_count * scale)
+        y_list: list[int] = []
+        groups_list: list[int] = []
+        for g_idx in range(data.n_groups):
+            for c_idx in range(data.n_classes):
+                count = round(data.group_vectors[g_idx, c_idx] * scale)
                 if count > 0:
                     y_list.extend([c_idx] * count)
                     groups_list.extend([g_idx] * count)
@@ -58,58 +86,37 @@ class SGKFBaseline(Optimizer):
         y_arr = np.array(y_list)
         groups_arr = np.array(groups_list)
 
-        X_dummy = np.zeros((len(y_arr), 1))
-
         class_counts = np.bincount(y_arr)
-        min_class_count = class_counts[class_counts > 0].min()
+        min_class_count = int(class_counts[class_counts > 0].min())
+        n_folds = min(self.max_folds, max(k, min_class_count))
 
-        n_splits = min(20, max(2, min_class_count))
+        seed = int(rng.integers(np.iinfo(np.int32).max))
+        cv = StratifiedGroupKFold(n_splits=n_folds, shuffle=True, random_state=seed)
 
-        cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=self.seed)
+        group_to_fold = np.zeros(data.n_groups, dtype=int)
+        for fold_idx, (_, test_idx) in enumerate(
+            cv.split(np.zeros((len(y_arr), 1)), y_arr, groups=groups_arr)
+        ):
+            group_to_fold[np.unique(groups_arr[test_idx])] = fold_idx
 
-        group_to_fold = np.zeros(self.data.n_groups, dtype=int)
-        for fold_idx, (_, test_idx) in enumerate(cv.split(X_dummy, y_arr, groups=groups_arr)):
-            fold_groups = np.unique(groups_arr[test_idx])
-            group_to_fold[fold_groups] = fold_idx
+        # Bin folds into splits proportionally, guaranteeing each split gets >= 1.
+        folds_per_split = largest_remainder(problem.ratios, n_folds)
+        fold_to_split = np.empty(n_folds, dtype=int)
+        fold = 0
+        for s, n_take in enumerate(folds_per_split):
+            for _ in range(n_take):
+                fold_to_split[fold] = s
+                fold += 1
+        fold_to_split[fold:] = k - 1  # any residue from a zero-share split
 
-        target_folds = [round(r * n_splits) for r in self.ratios]
+        assignment = fold_to_split[group_to_fold]
+        cost = problem.evaluate(assignment)
 
-        while sum(target_folds) < n_splits:
-            target_folds[np.argmax(self.ratios)] += 1
-        while sum(target_folds) > n_splits:
-            target_folds[np.argmax(self.ratios)] -= 1
-
-        fold_to_split = {}
-        current_split = 0
-        folds_assigned = 0
-
-        for fold in range(n_splits):
-            fold_to_split[fold] = current_split
-            folds_assigned += 1
-            if folds_assigned >= target_folds[current_split]:
-                current_split += 1
-                folds_assigned = 0
-                if current_split >= len(self.ratios):
-                    current_split = len(self.ratios) - 1
-
-        assignment = np.array([fold_to_split[group_to_fold[g]] for g in range(self.data.n_groups)])
-
-        actual = self._count_matrix(assignment)
-        cost = self._mape_cost(actual)
-
-        elapsed = time.perf_counter() - t_start
-
-        if verbose:
-            print(f"  [SGKF] heuristic finished with cost={cost:.4f} in {elapsed:.3f}s")
-
-        return SplitResult(
+        return Outcome(
             assignment=assignment,
             cost=cost,
             n_evals=1,
             n_iterations=1,
             converged=True,
-            elapsed_time=elapsed,
-            cost_history=[(1, cost), (self.max_evals, cost)] if self.max_evals > 0 else [(1, cost)],
-            target_counts=self._target.copy(),
-            actual_counts=actual,
+            cost_history=[(1, cost)],
         )

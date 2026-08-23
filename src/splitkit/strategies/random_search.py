@@ -1,99 +1,64 @@
-"""Random Search optimizer (stochastic best-of-N baseline)."""
+"""Random search: sample assignments independently and keep the best."""
+
+from __future__ import annotations
 
 import time
 
 import numpy as np
 
-from .base import N_SPLITS, Optimizer, SplitResult
+from ..problem import Budget, SplitProblem
+from .base import Outcome, Strategy
+from .registry import register_strategy
+
+#: How often to consult the wall clock, in evaluations.
+_TIME_CHECK_INTERVAL = 1024
 
 
-class RandomSearch(Optimizer):
-    """Random Search: evaluate max_evals i.i.d. random assignments, keep the best.
+@register_strategy
+class RandomSearch(Strategy):
+    """Independent uniform sampling under the target ratios.
 
-    Params
-    ------
-    data : GroupedDataset
-    ratios : tuple of float  target split fractions, must sum to 1
-    max_evals : int          total FFE budget (same as SA for fair comparison)
-    seed : int | None
+    A control, not a contender: it establishes how hard the search space is, and
+    every directed strategy should beat it by a wide margin. Useful in benchmarks
+    and as a sanity floor in tests.
     """
 
-    def __init__(
-        self,
-        data,
-        ratios: tuple[float, ...] = (0.70, 0.15, 0.15),
-        max_evals: int = 300_000,
-        seed: int | None = None,
-    ) -> None:
-        super().__init__(data, ratios, max_evals=max_evals, seed=seed)
+    name = "random"
 
-    # Core algorithm
-    def optimize(
+    def run(
         self,
-        verbose: bool = True,
-        log_interval: int = 10_000,
-    ) -> SplitResult:
-        """Run Random Search and return the best split found."""
-        rng = np.random.default_rng(self.seed)
+        problem: SplitProblem,
+        budget: Budget,
+        rng: np.random.Generator,
+        warm_start: np.ndarray | None = None,
+    ) -> Outcome:
         t_start = time.perf_counter()
+        deadline = budget.deadline_from(t_start)
+        max_evals = budget.max_evals if budget.max_evals is not None else 300_000
 
-        best_assignment: np.ndarray | None = None
-        best_actual:     np.ndarray | None = None
-        best_cost = float("inf")
-        cost_history: list[tuple[int, float]] = []
-        n_evals = 0
+        best_assignment = problem.random_assignment(rng)
+        best_cost = problem.evaluate(best_assignment)
+        cost_history: list[tuple[int, float]] = [(1, best_cost)]
+        n_evals = 1
 
-        if verbose:
-            print(
-                f"[RS] {self.data.name}"
-                f"  groups={self.data.n_groups}"
-                f"  classes={self.data.n_classes}"
-                f"  budget={self.max_evals:,} FFEs"
-            )
-
-        # Main loop: exactly max_evals FFEs
-        for n_evals in range(1, self.max_evals + 1):
-
-            assignment = rng.choice(
-                N_SPLITS,
-                size=self.data.n_groups,
-                p=self.ratios,
-            )
-
-            actual = self._count_matrix(assignment)
-            cost = self._mape_cost(actual)
+        while n_evals < max_evals and best_cost > budget.target_cost:
+            assignment = problem.random_assignment(rng)
+            cost = problem.evaluate(assignment)
+            n_evals += 1
 
             if cost < best_cost:
                 best_cost = cost
-                best_assignment = assignment.copy()
-                best_actual = actual.copy()
+                best_assignment = assignment
                 cost_history.append((n_evals, best_cost))
 
-            if n_evals % log_interval == 0:
-                elapsed = time.perf_counter() - t_start
-                if verbose:
-                    print(
-                        f"  evals {n_evals:>7,}"
-                        f"  best_cost={best_cost:.4f}"
-                        f"  elapsed={elapsed:.1f}s"
-                    )
+            if n_evals % _TIME_CHECK_INTERVAL == 0 and time.perf_counter() >= deadline:
+                break
 
-        elapsed = time.perf_counter() - t_start
-
-        # Fallback: if max_evals == 0 or data is empty, return a trivial result
-        if best_assignment is None:
-            best_assignment = np.zeros(self.data.n_groups, dtype=np.intp)
-            best_actual = self._count_matrix(best_assignment)
-            best_cost = self._mape_cost(best_actual)
-
-        return SplitResult(
+        return Outcome(
             assignment=best_assignment,
             cost=best_cost,
             n_evals=n_evals,
             n_iterations=n_evals,
-            converged=False,
-            elapsed_time=elapsed,
+            converged=best_cost <= budget.target_cost,
             cost_history=cost_history,
-            target_counts=self._target.copy(),
-            actual_counts=best_actual,
         )

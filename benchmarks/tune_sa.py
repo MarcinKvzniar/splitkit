@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
+from splitkit import Budget, SplitProblem
 from splitkit.io import load_npz
 from splitkit.strategies import SimulatedAnnealing
 
@@ -35,6 +36,8 @@ if __name__ == "__main__":
 
     log(f"Loading {DATASET_PATH}...")
     data = load_npz(DATASET_PATH)
+    problem = SplitProblem.build(data, RATIOS)
+    budget = Budget(max_evals=MAX_EVALS)
 
     keys = list(GRID.keys())
     combinations = list(itertools.product(*(GRID[k] for k in keys)))
@@ -55,10 +58,9 @@ if __name__ == "__main__":
         histories = []
 
         for seed in SEEDS:
-            opt = SimulatedAnnealing(
-                data=data, ratios=RATIOS, max_evals=MAX_EVALS, seed=seed, **params
+            res = SimulatedAnnealing(**params).run(
+                problem, budget, np.random.default_rng(seed)
             )
-            res = opt.optimize(verbose=False)
             costs.append(res.cost)
             histories.append(res)
 

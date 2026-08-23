@@ -11,13 +11,21 @@ __version__ = "0.1.0.dev0"
 
 from .dataset import GroupedDataset
 from .io import load_npz, save_npz
+from .objectives import get_objective
+from .problem import Budget, SplitProblem
+from .strategies import get_strategy, list_strategies
 from .synthetic import from_preset, list_presets, make_synthetic
 
 __all__ = [
+    "Budget",
     "GroupedDataset",
+    "SplitProblem",
     "__version__",
     "from_preset",
+    "get_objective",
+    "get_strategy",
     "list_presets",
+    "list_strategies",
     "load_npz",
     "make_synthetic",
     "save_npz",
