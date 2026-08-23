@@ -2,8 +2,7 @@
 
 > **Course:** Optimization Methods: Theory and Applications - Final Project
 
-> **Author:** Marcin Kuźniar
-
+> **Authors:** Marcin Kuźniar
 ---
 
 ## Problem Description

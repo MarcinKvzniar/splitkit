@@ -16,12 +16,14 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from src.optimizers import RandomSearch, SimulatedAnnealing
-from src.optimizers.de import DifferentialEvolution
-from src.optimizers.stratified_group_k_fold import SGKFBaseline
-from src.preprocessing.common import DatasetGroups, load_dataset
+from splitkit import GroupedDataset
+from splitkit.io import load_npz
+from splitkit.strategies import (
+    DifferentialEvolution,
+    RandomSearch,
+    SGKFBaseline,
+    SimulatedAnnealing,
+)
 
 MAX_EVALS = 300_000
 RATIOS = (0.70, 0.15, 0.15)
@@ -43,11 +45,11 @@ _STYLE = {
 }
 
 _DATASET_PATHS = {
-    "bcss": "datasets/bcss/preprocessed/groups.pkl",
-    "celeba": "datasets/celeb-faces/preprocessed/groups.pkl",
-    "isic": "datasets/isic2020/preprocessed/groups.pkl",
+    "bcss": "datasets/bcss/preprocessed/groups.npz",
+    "celeba": "datasets/celeb-faces/preprocessed/groups.npz",
+    "isic": "datasets/isic2020/preprocessed/groups.npz",
 }
-for _pkl in sorted(glob.glob("datasets/synthetic/preprocessed/*.pkl")):
+for _pkl in sorted(glob.glob("datasets/synthetic/preprocessed/*.npz")):
     _DATASET_PATHS[os.path.splitext(os.path.basename(_pkl))[0]] = _pkl
 
 
@@ -55,9 +57,9 @@ def _result_folder(name: str) -> str:
     return "synthetic" if name.startswith("synth_") else name
 
 
-def run_one(dataset_name: str) -> tuple[DatasetGroups, dict]:
+def run_one(dataset_name: str) -> tuple[GroupedDataset, dict]:
     """Runs all optimizers across all seeds for a single dataset."""
-    data = load_dataset(_DATASET_PATHS[dataset_name])
+    data = load_npz(_DATASET_PATHS[dataset_name])
     results = {}
 
     for label, cls, kwargs in _OPTIMIZERS:
@@ -100,7 +102,7 @@ def run_one(dataset_name: str) -> tuple[DatasetGroups, dict]:
 
 def plot_convergence(name: str, results: dict, outdir: str):
     """Plots the mean convergence curve with a +/- Std Dev shaded region."""
-    fig, ax = plt.subplots(figsize=(8, 5))
+    _fig, ax = plt.subplots(figsize=(8, 5))
 
     ffe_grid = np.linspace(0, MAX_EVALS, 1000)
 
@@ -202,10 +204,9 @@ if __name__ == "__main__":
     for name, grp, cls, res, winner in summary_rows:
         row_str = f"{name:<20} {grp:>8} {cls:>8} "
         for a in algs:
-            if a in res:
-                cost_str = f"{res[a]['mean_cost']:.3f}±{res[a]['std_cost']:.3f}"
-            else:
-                cost_str = "N/A"
+            cost_str = (
+                f"{res[a]['mean_cost']:.3f}±{res[a]['std_cost']:.3f}" if a in res else "N/A"
+            )
             row_str += f"{cost_str:>15}"
         row_str += f" {winner:>8}"
         buf.write(row_str + "\n")

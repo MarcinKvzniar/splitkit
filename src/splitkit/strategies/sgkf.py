@@ -3,7 +3,6 @@
 import time
 
 import numpy as np
-from sklearn.model_selection import StratifiedGroupKFold
 
 from .base import Optimizer, SplitResult
 
@@ -30,6 +29,14 @@ class SGKFBaseline(Optimizer):
         verbose: bool = True,
         log_interval: int = 10_000,
     ) -> SplitResult:
+        try:
+            from sklearn.model_selection import StratifiedGroupKFold
+        except ImportError as exc:  # pragma: no cover - exercised via extras
+            raise ImportError(
+                "The SGKF baseline requires scikit-learn. "
+                "Install it with: pip install 'splitkit[sklearn]'"
+            ) from exc
+
         t_start = time.perf_counter()
 
         y_list = []
@@ -43,7 +50,7 @@ class SGKFBaseline(Optimizer):
         for g_idx in range(self.data.n_groups):
             for c_idx in range(self.data.n_classes):
                 raw_count = self.data.group_vectors[g_idx, c_idx]
-                count = int(round(raw_count * scale))
+                count = round(raw_count * scale)
                 if count > 0:
                     y_list.extend([c_idx] * count)
                     groups_list.extend([g_idx] * count)
@@ -65,7 +72,7 @@ class SGKFBaseline(Optimizer):
             fold_groups = np.unique(groups_arr[test_idx])
             group_to_fold[fold_groups] = fold_idx
 
-        target_folds = [int(round(r * n_splits)) for r in self.ratios]
+        target_folds = [round(r * n_splits) for r in self.ratios]
 
         while sum(target_folds) < n_splits:
             target_folds[np.argmax(self.ratios)] += 1

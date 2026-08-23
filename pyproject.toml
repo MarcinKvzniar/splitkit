@@ -1,36 +1,111 @@
 [project]
-name = "optimization-methods-final-project"
-version = "0.1.0"
-description = "Metaheuristic optimization of group-aware stratified splitting for imbalanced hierarchical datasets"
+name = "splitkit"
+dynamic = ["version"]
+description = "Group-aware stratified dataset splitting: leakage-free train/val/test splits that preserve class distributions"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
 authors = [
     { name = "Marcin Kuźniar" },
 ]
-requires-python = ">=3.12"
-dependencies = [
-    "matplotlib>=3.10.9",
-    "numpy>=2.0",
-    "pandas>=2.0",
-    "pillow>=10.0",
-    "scikit-learn>=1.9.0",
+keywords = [
+    "machine-learning", "dataset", "train-test-split", "stratification",
+    "cross-validation", "data-leakage", "group-kfold", "scikit-learn",
+    "bioinformatics", "medical-imaging",
 ]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = ["numpy>=1.23"]
+
+[project.optional-dependencies]
+pandas  = ["pandas>=1.5"]
+sklearn = ["scikit-learn>=1.1"]
+viz     = ["matplotlib>=3.6"]
+exact   = ["ortools>=9.7"]
+milp    = ["scipy>=1.9"]
+cbc     = ["pulp>=2.7"]
+all     = ["splitkit[pandas,sklearn,viz,exact,milp]"]
+
+[project.urls]
+Homepage      = "https://github.com/MarcinKvzniar/splitkit"
+Repository    = "https://github.com/MarcinKvzniar/splitkit"
+Issues        = "https://github.com/MarcinKvzniar/splitkit/issues"
+Changelog     = "https://github.com/MarcinKvzniar/splitkit/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.14",
+    "pytest>=8",
+    "pytest-cov",
+    "pytest-benchmark",
+    "hypothesis>=6.100",
+    "ruff>=0.15",
+    "mypy>=1.10",
+    "build",
+    "twine",
 ]
-
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-preview = true
-select = ["E", "F", "W", "I"]
-extend-select = ["E221", "E222", "E241", "E242"]
-ignore = ["E501"]
-
-[tool.hatch.build.targets.wheel]
-packages = ["src"]
+bench = ["matplotlib>=3.6", "pandas>=1.5", "pillow>=10.0", "scikit-learn>=1.1"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/splitkit/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/splitkit"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/splitkit", "tests", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml"]
+exclude = ["benchmarks", "datasets", "results", "docs", "examples", "uv.lock", ".github"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "slow: long-running tests",
+    "exact: requires an exact solver backend (ortools/scipy/pulp)",
+    "sklearn: requires scikit-learn",
+]
+
+[tool.coverage.run]
+source = ["splitkit"]
+omit = ["*/viz.py", "*/cli.py"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "benchmarks"]
+
+[tool.ruff.lint]
+preview = true
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "NPY"]
+extend-select = ["E221", "E222", "E241", "E242"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# run_benchmark.py must call warnings.filterwarnings before importing sklearn
+"benchmarks/*" = ["T201", "E402"]
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/splitkit"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["pandas.*", "sklearn.*", "matplotlib.*", "ortools.*", "scipy.*", "pulp.*"]
+ignore_missing_imports = true

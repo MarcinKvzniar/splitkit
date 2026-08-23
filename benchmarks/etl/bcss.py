@@ -1,23 +1,23 @@
-"""
-BCSS preprocessing: 151 WSI mask PNGs -> DatasetGroups.
+"""BCSS: WSI mask PNGs -> GroupedDataset.
 
-Groups: WSIs. Items: non-overlapping PATCH_SIZExPATCH_SIZE tiles.
-Feature vector: pixel counts for classes 1-21 (class 0 = outside ROI, excluded).
+Groups: whole-slide images. Items: non-overlapping PATCH_SIZExPATCH_SIZE tiles.
+Vector: pixel counts for classes 1-21 (class 0 = outside ROI, excluded).
 Group size = floor(H/PATCH_SIZE) x floor(W/PATCH_SIZE).
+
+    uv run python -m benchmarks.etl.bcss --data-dir datasets/bcss
 """
 
+from __future__ import annotations
+
+import argparse
 import os
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-from .common import DatasetGroups, save_dataset
-
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(os.path.dirname(_HERE))
-
-MASK_DIR = os.path.join(_ROOT, "datasets", "bcss", "mask")
-OUTPUT_PATH = os.path.join(_ROOT, "datasets", "bcss", "preprocessed", "groups.pkl")
+from splitkit import GroupedDataset
+from splitkit.io import save_npz
 
 PATCH_SIZE = 512
 
@@ -48,10 +48,15 @@ CLASS_NAMES = [
 N_CLASSES = len(CLASS_NAMES)  # 21
 
 
-def preprocess(patch_size: int = PATCH_SIZE) -> DatasetGroups:
-    mask_files = sorted(f for f in os.listdir(MASK_DIR) if f.endswith(".png"))
+def preprocess(
+    data_dir: Path,
+    output: Path | None = None,
+    patch_size: int = PATCH_SIZE,
+) -> GroupedDataset:
+    mask_dir = data_dir / "mask"
+    mask_files = sorted(f for f in os.listdir(mask_dir) if f.endswith(".png"))
     if not mask_files:
-        raise FileNotFoundError(f"No mask PNG files found in {MASK_DIR}")
+        raise FileNotFoundError(f"No mask PNG files found in {mask_dir}")
 
     group_ids: list[str] = []
     group_vectors: list = []
@@ -60,7 +65,7 @@ def preprocess(patch_size: int = PATCH_SIZE) -> DatasetGroups:
     print(f"[BCSS] Processing {len(mask_files)} masks (patch_size={patch_size})...")
     for idx, fname in enumerate(mask_files, 1):
         wsi_id = fname.split("_xmin")[0]
-        mask_path = os.path.join(MASK_DIR, fname)
+        mask_path = mask_dir / fname
 
         mask = np.array(Image.open(mask_path))
         h, w = mask.shape
@@ -77,17 +82,29 @@ def preprocess(patch_size: int = PATCH_SIZE) -> DatasetGroups:
         if idx % 25 == 0 or idx == len(mask_files):
             print(f"  {idx}/{len(mask_files)}  {fname}")
 
-    data = DatasetGroups(
-        dataset_name="BCSS",
-        group_ids=group_ids,
-        group_vectors=np.array(group_vectors, dtype=np.int64),
-        group_sizes=np.array(group_sizes, dtype=np.int32),
-        class_names=CLASS_NAMES,
+    data = GroupedDataset(
+        group_ids=np.asarray(group_ids, dtype=np.str_),
+        group_vectors=np.array(group_vectors, dtype=np.float64),
+        group_sizes=np.array(group_sizes, dtype=np.float64),
+        class_names=tuple(CLASS_NAMES),
+        name="BCSS",
     )
-    save_dataset(data, OUTPUT_PATH)
+
+    out = output or data_dir / "preprocessed" / "groups.npz"
+    save_npz(data, out)
+    print(f"[saved] {data.name} -> {out}")
     print(data.summary())
     return data
 
 
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--data-dir", type=Path, default=Path("datasets/bcss"))
+    ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--patch-size", type=int, default=PATCH_SIZE)
+    args = ap.parse_args()
+    preprocess(args.data_dir, args.out, args.patch_size)
+
+
 if __name__ == "__main__":
-    preprocess()
+    main()

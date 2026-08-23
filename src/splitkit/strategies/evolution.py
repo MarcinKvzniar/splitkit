@@ -17,8 +17,8 @@ class DifferentialEvolution(Optimizer):
         self.crossover_prob = crossover_prob
         self.strategy = strategy
 
-        _, self._base, _diffs, self._cross = strategy.split("/")
-        self._n_diffs = int(_diffs)
+        _, self._base, n_diffs, self._cross = strategy.split("/")
+        self._n_diffs = int(n_diffs)
 
         min_pop = (2 * self._n_diffs) + (1 if self._base == "rand" else 0) + 1
         if pop_size < min_pop:
@@ -125,7 +125,7 @@ class DifferentialEvolution(Optimizer):
             cost=best_cost,
             n_evals=n_evals,
             n_iterations=iteration,
-            converged=(best_cost == 0.0),
+            converged=bool(best_cost <= 0.0),
             elapsed_time=elapsed,
             cost_history=cost_history,
             target_counts=self._target.copy(),

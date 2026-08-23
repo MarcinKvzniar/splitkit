@@ -19,7 +19,7 @@ class SimulatedAnnealing(Optimizer):
 
     Params
     ------
-    data : DatasetGroups
+    data : GroupedDataset
     ratios : tuple of float        target split fractions, must sum to 1
     max_evals : int                total FFE budget (shared by all algorithms)
     initial_temp : float           starting temperature
@@ -85,7 +85,7 @@ class SimulatedAnnealing(Optimizer):
 
         if verbose:
             print(
-                f"[SA] {self.data.dataset_name}"
+                f"[SA] {self.data.name}"
                 f"  groups={self.data.n_groups}"
                 f"  classes={self.data.n_classes}"
                 f"  budget={self.max_evals:,} FFEs"

@@ -12,7 +12,7 @@ class RandomSearch(Optimizer):
 
     Params
     ------
-    data : DatasetGroups
+    data : GroupedDataset
     ratios : tuple of float  target split fractions, must sum to 1
     max_evals : int          total FFE budget (same as SA for fair comparison)
     seed : int | None
@@ -45,7 +45,7 @@ class RandomSearch(Optimizer):
 
         if verbose:
             print(
-                f"[RS] {self.data.dataset_name}"
+                f"[RS] {self.data.name}"
                 f"  groups={self.data.n_groups}"
                 f"  classes={self.data.n_classes}"
                 f"  budget={self.max_evals:,} FFEs"

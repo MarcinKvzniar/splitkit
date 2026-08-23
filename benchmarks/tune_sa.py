@@ -1,18 +1,17 @@
 import itertools
 import os
-import sys
 import time
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from splitkit.io import load_npz
+from splitkit.strategies import SimulatedAnnealing
 
-from src.optimizers import SimulatedAnnealing
-from src.preprocessing.common import load_dataset
+from ._history import unpack_history
 
-DATASET_PATH = "datasets/synthetic/preprocessed/synth_mild_imbalance.pkl"
+DATASET_PATH = "datasets/synthetic/preprocessed/synth_mild_imbalance.npz"
 RATIOS = (0.70, 0.15, 0.15)
 MAX_EVALS = 300_000
 N_RUNS = 10
@@ -25,27 +24,6 @@ GRID = {
 }
 
 
-def _unpack_history(result) -> tuple[np.ndarray, np.ndarray]:
-    if not result.cost_history:
-        return np.array([result.n_evals], dtype=float), np.array([result.cost], dtype=float)
-
-    filtered_evals, filtered_costs = [], []
-    best_so_far = float('inf')
-
-    for e, c in result.cost_history:
-        if c < best_so_far:
-            best_so_far = c
-            filtered_evals.append(e)
-            filtered_costs.append(c)
-
-    last_e = max(result.n_evals, result.cost_history[-1][0])
-    if filtered_evals[-1] < last_e:
-        filtered_evals.append(last_e)
-        filtered_costs.append(best_so_far)
-
-    return np.asarray(filtered_evals, dtype=float), np.asarray(filtered_costs, dtype=float)
-
-
 if __name__ == "__main__":
     outdir = "results/tuning"
     os.makedirs(outdir, exist_ok=True)
@@ -56,7 +34,7 @@ if __name__ == "__main__":
         report_lines.append(msg)
 
     log(f"Loading {DATASET_PATH}...")
-    data = load_dataset(DATASET_PATH)
+    data = load_npz(DATASET_PATH)
 
     keys = list(GRID.keys())
     combinations = list(itertools.product(*(GRID[k] for k in keys)))
@@ -71,7 +49,7 @@ if __name__ == "__main__":
 
     t_start_all = time.time()
     for i, values in enumerate(combinations):
-        params = dict(zip(keys, values))
+        params = dict(zip(keys, values, strict=True))
 
         costs = []
         histories = []
@@ -123,8 +101,8 @@ if __name__ == "__main__":
             ax = axes[row, col]
 
             for tmin in GRID["min_temp"]:
-                res = results[(t0, cr, tmin)]["representative_res"]
-                evals, costs = _unpack_history(res)
+                res = results[t0, cr, tmin]["representative_res"]
+                evals, costs = unpack_history(res)
                 sty = styles[tmin]
 
                 ax.step(evals, costs, label=f"min_temp={tmin}", color=sty["color"],

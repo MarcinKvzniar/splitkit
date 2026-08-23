@@ -110,7 +110,10 @@ class GroupedDataset:
             "-" * 62,
         ]
         for name, freq, count in zip(
-            self.class_names, self.global_class_frequencies, self.global_class_counts
+            self.class_names,
+            self.global_class_frequencies,
+            self.global_class_counts,
+            strict=True,
         ):
             lines.append(f"{name:<40} {freq * 100:>9.3f}%  {int(count):>10,}")
         lines.append("=" * 62)

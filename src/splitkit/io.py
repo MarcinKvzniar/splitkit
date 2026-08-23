@@ -13,7 +13,7 @@ import numpy as np
 
 from .dataset import GroupedDataset
 
-__all__ = ["save_npz", "load_npz"]
+__all__ = ["load_npz", "save_npz"]
 
 FORMAT_VERSION = 1
 
