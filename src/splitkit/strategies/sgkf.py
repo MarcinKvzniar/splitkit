@@ -88,7 +88,9 @@ class SGKFBaseline(Strategy):
 
         class_counts = np.bincount(y_arr)
         min_class_count = int(class_counts[class_counts > 0].min())
-        n_folds = min(self.max_folds, max(k, min_class_count))
+        # Never ask for more folds than there are groups to fill them; K <= n_groups
+        # is already guaranteed by SplitProblem, so the result stays >= K.
+        n_folds = min(self.max_folds, data.n_groups, max(k, min_class_count))
 
         seed = int(rng.integers(np.iinfo(np.int32).max))
         cv = StratifiedGroupKFold(n_splits=n_folds, shuffle=True, random_state=seed)

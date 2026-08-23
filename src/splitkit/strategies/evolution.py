@@ -110,9 +110,11 @@ class DifferentialEvolution(Strategy):
         iteration = 0
         cost_history: list[tuple[int, float]] = [(n_evals, best_cost)]
         stop = False
+        converged_population = False
 
         while n_evals < max_evals and best_cost > budget.target_cost and not stop:
             iteration += 1
+            evals_at_generation_start = n_evals
 
             for i in range(pop_size):
                 if n_evals >= max_evals:
@@ -171,6 +173,14 @@ class DifferentialEvolution(Strategy):
             if n_evals % self.history_interval < pop_size:
                 cost_history.append((n_evals, best_cost))
 
+            # A generation in which no trial changed any assignment means the
+            # population has collapsed: every latent argmax now matches its parent,
+            # so no further evaluation can ever be spent and the budget would never
+            # be consumed. Stop instead of spinning forever.
+            if n_evals == evals_at_generation_start:
+                converged_population = True
+                break
+
             if time.perf_counter() >= deadline:
                 stop = True
 
@@ -179,6 +189,6 @@ class DifferentialEvolution(Strategy):
             cost=best_cost,
             n_evals=n_evals,
             n_iterations=iteration,
-            converged=best_cost <= budget.target_cost,
+            converged=best_cost <= budget.target_cost or converged_population,
             cost_history=cost_history,
         )

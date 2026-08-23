@@ -99,7 +99,9 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # run_benchmark.py must call warnings.filterwarnings before importing sklearn
 "benchmarks/*" = ["T201", "E402"]
-"tests/*" = ["S101"]
+# Tests assert exact zeros deliberately: a zero-weight mask, |t-t|, and exactly
+# representable sums are exact by construction, and approximation would weaken them.
+"tests/*" = ["S101", "RUF069"]
 
 [tool.mypy]
 python_version = "3.10"

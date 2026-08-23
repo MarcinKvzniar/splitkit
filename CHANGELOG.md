@@ -66,9 +66,33 @@ group-aware stratified splitting) and is being rebuilt as an installable package
 
 ### Fixed
 
+- **Differential evolution could loop forever.** An evaluation is only spent when
+  a trial's discretised assignment differs from its parent, so once the population
+  collapses no trial differs, the evaluation counter stops advancing, and
+  `while n_evals < max_evals` never terminates. Reproducible on small problems
+  with small populations (`DE/best/1/bin`, `pop_size=12`); large benchmark runs
+  masked it. A generation that spends no evaluations now ends the run and reports
+  `converged`.
+- **SGKF could request more folds than there are groups.** The fold count was
+  capped by the rarest class and by 20, but never by the number of groups, so a
+  6-group dataset asked scikit-learn for 20 folds and raised. It is now capped by
+  group count as well.
 - `splitkit.strategies` no longer requires scikit-learn to import; the dependency
   is resolved lazily when the SGKF baseline actually runs, and the error names
   the extra to install.
+
+### Testing
+
+- First test suite for the project: 239 tests, 100% statement coverage of
+  `src/splitkit`, running in under 10 seconds.
+- Strategy tests are parametrized over the registry, so a newly registered
+  strategy is held to the full contract automatically.
+- A brute-force oracle enumerates every assignment for tiny instances, giving
+  incontestable ground truth for optimality claims.
+- The incremental-update invariant is pinned down explicitly: incremental counts,
+  rejected-move undo, and two-row cost deltas are each checked against a fresh
+  recomputation. This is the precondition for replacing the full cost
+  recomputation with true O(C) deltas.
 
 ### Notes on correctness
 
