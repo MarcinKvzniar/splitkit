@@ -82,11 +82,11 @@ def preprocess(
         if idx % 25 == 0 or idx == len(mask_files):
             print(f"  {idx}/{len(mask_files)}  {fname}")
 
-    data = GroupedDataset(
-        group_ids=np.asarray(group_ids, dtype=np.str_),
-        group_vectors=np.array(group_vectors, dtype=np.float64),
+    data = GroupedDataset.from_counts(
+        np.array(group_vectors, dtype=np.float64),
+        group_ids=group_ids,
+        class_names=CLASS_NAMES,
         group_sizes=np.array(group_sizes, dtype=np.float64),
-        class_names=tuple(CLASS_NAMES),
         name="BCSS",
     )
 

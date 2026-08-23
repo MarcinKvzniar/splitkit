@@ -32,3 +32,9 @@ build/
 # build artifacts
 dist/
 *.whl
+
+# test/coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/

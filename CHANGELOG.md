@@ -20,6 +20,19 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   `allow_pickle`, so opening a dataset file cannot execute code.
 - `splitkit.synthetic`: `make_synthetic()`, `from_preset()` and six named presets,
   promoted from a benchmark script into the public API.
+- **Dataset builders.** `GroupedDataset.from_arrays()`, `.from_labels()`
+  (scikit-learn's `(y, groups)` argument order), `.from_counts()` and
+  `.from_dataframe()`. The DataFrame builder covers the three shapes real data
+  arrives in — one categorical column (`label_col`), several indicator columns
+  (`label_cols`), or rows that already *are* count vectors (`count_cols`, with an
+  optional `size_col`). A ±1 indicator encoding is detected and mapped to 0/1
+  rather than cancelling presence against absence. Only `from_dataframe` needs
+  pandas, and it raises an actionable install message when absent.
+- **Item provenance** (`item_group_index`). Datasets built from item-level input
+  record which group each row belongs to, so a split can return the row indices
+  a user actually trains on rather than only naming groups. Costs 4 bytes per
+  item and can be disabled with `track_items=False`. `subset()` deliberately
+  drops it, since retained indices would point at the old group numbering.
 - `SplitProblem`: immutable problem object holding the count matrix, class
   weights, target counts and prepared objective. Strategies are now stateless.
 - `Budget`: `max_evals`, `time_limit` and `target_cost` stop conditions.
@@ -54,7 +67,9 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   `_unpack_history` helper is shared.
 - Dataset ETL scripts take `--data-dir` instead of walking up from `__file__`,
   which broke as soon as directory depth changed and was meaningless once
-  installed.
+  installed. They now build datasets through the public builders, which removed
+  their hand-rolled aggregation loops (ISIC looped per row) and the hardcoded
+  CelebA ±1 conversion. All three reproduce the committed fixtures byte for byte.
 
 ### Removed
 
@@ -83,8 +98,8 @@ group-aware stratified splitting) and is being rebuilt as an installable package
 
 ### Testing
 
-- First test suite for the project: 239 tests, 100% statement coverage of
-  `src/splitkit`, running in under 10 seconds.
+- First test suite for the project: 281 tests, 100% statement coverage of
+  `src/splitkit`, running in about 8 seconds.
 - Strategy tests are parametrized over the registry, so a newly registered
   strategy is held to the full contract automatically.
 - A brute-force oracle enumerates every assignment for tiny instances, giving
@@ -93,6 +108,8 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   rejected-move undo, and two-row cost deltas are each checked against a fresh
   recomputation. This is the precondition for replacing the full cost
   recomputation with true O(C) deltas.
+- Builder tests assert the no-leakage guarantee end to end: every item of a group
+  lands in one split, and the returned item indices partition the dataset exactly.
 
 ### Notes on correctness
 

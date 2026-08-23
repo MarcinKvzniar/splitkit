@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from splitkit import GroupedDataset
@@ -29,15 +28,8 @@ def preprocess(data_dir: Path, output: Path | None = None) -> GroupedDataset:
         f"{df['diagnosis'].nunique()} diagnosis classes"
     )
 
-    table = pd.crosstab(df["patient_id"], df["diagnosis"]).sort_index()
-    table = table.reindex(columns=sorted(table.columns))
-
-    data = GroupedDataset(
-        group_ids=np.asarray(table.index.astype(str), dtype=np.str_),
-        group_vectors=table.to_numpy(dtype=np.float64),
-        group_sizes=table.to_numpy(dtype=np.float64).sum(axis=1),
-        class_names=tuple(str(c) for c in table.columns),
-        name="ISIC2020",
+    data = GroupedDataset.from_dataframe(
+        df, group_col="patient_id", label_col="diagnosis", name="ISIC2020"
     )
 
     out = output or data_dir / "preprocessed" / "groups.npz"

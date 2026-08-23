@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from splitkit import GroupedDataset
@@ -31,7 +30,6 @@ def preprocess(data_dir: Path, output: Path | None = None) -> GroupedDataset:
     attr_df = pd.read_csv(data_dir / "list_attr_celeba.csv")
 
     attr_cols = [c for c in attr_df.columns if c != "image_id"]
-    attr_df[attr_cols] = ((attr_df[attr_cols] + 1) // 2).astype(np.int8)
 
     print("[CelebA] Merging attributes with identities...")
     merged = attr_df.merge(identity_df, on="image_id")
@@ -41,16 +39,8 @@ def preprocess(data_dir: Path, output: Path | None = None) -> GroupedDataset:
     )
 
     print("[CelebA] Aggregating group feature vectors...")
-    grouped = merged.groupby("identity_id")
-    vectors = grouped[attr_cols].sum().sort_index()
-    sizes = grouped.size().sort_index()
-
-    data = GroupedDataset(
-        group_ids=np.asarray(vectors.index.astype(str), dtype=np.str_),
-        group_vectors=vectors.to_numpy(dtype=np.float64),
-        group_sizes=sizes.to_numpy(dtype=np.float64),
-        class_names=tuple(attr_cols),
-        name="CelebA",
+    data = GroupedDataset.from_dataframe(
+        merged, group_col="identity_id", label_cols=attr_cols, name="CelebA"
     )
 
     out = output or data_dir / "preprocessed" / "groups.npz"
