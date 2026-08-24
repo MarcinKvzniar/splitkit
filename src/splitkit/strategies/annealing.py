@@ -8,7 +8,7 @@ import time
 import numpy as np
 
 from ..problem import Budget, SplitProblem
-from .base import Outcome, Strategy
+from .base import Outcome, Strategy, resolve_max_evals
 from .registry import register_strategy
 
 #: How often to consult the wall clock, in evaluations.
@@ -33,9 +33,16 @@ class SimulatedAnnealing(Strategy):
     initial_temp
         Starting temperature. Should be on the order of a typical cost delta.
     cooling_rate
-        Per-step multiplier in (0, 1).
+        Per-step multiplier in (0, 1), or ``"auto"`` (the default) to fit the
+        schedule to the budget. A fixed rate silently assumes a particular budget:
+        0.9999 needs roughly 300k steps to anneal, so on a 5k-step run the search
+        never leaves its exploration phase and returns something close to random.
     min_temp
         Reheat trigger; must be below ``initial_temp``.
+    anneal_cycles
+        How many times ``"auto"`` should cool from ``initial_temp`` to ``min_temp``
+        across the budget. Each cycle ends in a reheat from the best assignment
+        found, so more cycles means more, shorter dives.
     """
 
     name = "annealing"
@@ -44,12 +51,23 @@ class SimulatedAnnealing(Strategy):
     def __init__(
         self,
         initial_temp: float = 100.0,
-        cooling_rate: float = 0.9999,
+        cooling_rate: float | str = "auto",
         min_temp: float = 1e-4,
+        anneal_cycles: float = 2.0,
     ) -> None:
-        if not 0.0 < cooling_rate < 1.0:
+        if isinstance(cooling_rate, str):
+            if cooling_rate != "auto":
+                raise ValueError(
+                    f"cooling_rate must be a number in (0, 1) or 'auto', "
+                    f"got {cooling_rate!r}."
+                )
+        elif not 0.0 < cooling_rate < 1.0:
             raise ValueError(
                 f"cooling_rate must be in the open interval (0, 1), got {cooling_rate}."
+            )
+        if anneal_cycles <= 0:
+            raise ValueError(
+                f"anneal_cycles must be positive, got {anneal_cycles}."
             )
         if initial_temp <= 0.0:
             raise ValueError(f"initial_temp must be positive, got {initial_temp}.")
@@ -61,6 +79,19 @@ class SimulatedAnnealing(Strategy):
         self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate
         self.min_temp = min_temp
+        self.anneal_cycles = anneal_cycles
+
+    def _resolve_cooling_rate(self, max_evals: int) -> float:
+        """Per-step multiplier, fitted to the budget when set to "auto".
+
+        Solves ``rate ** (max_evals / cycles) == min_temp / initial_temp`` so the
+        temperature completes the requested number of anneal cycles in the budget
+        actually available, instead of assuming one.
+        """
+        if self.cooling_rate != "auto":
+            return float(self.cooling_rate)
+        steps = max(1.0, max_evals / self.anneal_cycles)
+        return float(math.exp(math.log(self.min_temp / self.initial_temp) / steps))
 
     def run(
         self,
@@ -71,12 +102,20 @@ class SimulatedAnnealing(Strategy):
     ) -> Outcome:
         t_start = time.perf_counter()
         deadline = budget.deadline_from(t_start)
-        max_evals = budget.max_evals if budget.max_evals is not None else 300_000
+        max_evals = resolve_max_evals(budget)
 
         k = problem.n_splits
         n_groups = problem.n_groups
         vectors = problem.vectors
         total = problem.prepared.total
+        cooling_rate = self._resolve_cooling_rate(max_evals)
+        # With only a wall-clock budget there is no evaluation count to fit the
+        # schedule to, so calibrate once from observed throughput.
+        needs_calibration = (
+            self.cooling_rate == "auto"
+            and budget.max_evals is None
+            and budget.time_limit is not None
+        )
 
         if warm_start is not None:
             assignment = np.asarray(warm_start, dtype=np.intp).copy()
@@ -132,7 +171,7 @@ class SimulatedAnnealing(Strategy):
                 counts[new_s] -= vec
                 counts[old_s] += vec
 
-            temp *= self.cooling_rate
+            temp *= cooling_rate
 
             if temp < self.min_temp:
                 temp = self.initial_temp
@@ -141,8 +180,16 @@ class SimulatedAnnealing(Strategy):
                 cost = best_cost
                 n_reheats += 1
 
-            if n_evals % _TIME_CHECK_INTERVAL == 0 and time.perf_counter() >= deadline:
-                break
+            if n_evals % _TIME_CHECK_INTERVAL == 0:
+                now = time.perf_counter()
+                if needs_calibration:
+                    rate = n_evals / max(now - t_start, 1e-9)
+                    cooling_rate = self._resolve_cooling_rate(
+                        max(1, int(rate * budget.time_limit))
+                    )
+                    needs_calibration = False
+                if now >= deadline:
+                    break
 
         return Outcome(
             assignment=best_assignment,

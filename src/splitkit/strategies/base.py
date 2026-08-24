@@ -10,7 +10,26 @@ import numpy as np
 
 from ..problem import Budget, SplitProblem
 
-__all__ = ["Outcome", "Strategy"]
+__all__ = ["DEFAULT_MAX_EVALS", "Outcome", "Strategy", "resolve_max_evals"]
+
+#: Evaluation budget assumed when the caller gives no stop condition at all.
+DEFAULT_MAX_EVALS = 300_000
+
+#: Stand-in for "unbounded" when wall-clock time is the real constraint.
+_EFFECTIVELY_UNBOUNDED = 1 << 62
+
+
+def resolve_max_evals(budget: Budget) -> int:
+    """The evaluation ceiling a strategy should loop against.
+
+    When only a time limit is given the evaluation count must not cap the run,
+    or a fast machine would stop early with budget left on the clock.
+    """
+    if budget.max_evals is not None:
+        return budget.max_evals
+    if budget.time_limit is not None:
+        return _EFFECTIVELY_UNBOUNDED
+    return DEFAULT_MAX_EVALS
 
 
 @dataclass

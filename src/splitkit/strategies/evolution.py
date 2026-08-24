@@ -7,7 +7,7 @@ import time
 import numpy as np
 
 from ..problem import Budget, SplitProblem
-from .base import Outcome, Strategy
+from .base import Outcome, Strategy, resolve_max_evals
 from .registry import register_strategy
 
 
@@ -84,7 +84,7 @@ class DifferentialEvolution(Strategy):
     ) -> Outcome:
         t_start = time.perf_counter()
         deadline = budget.deadline_from(t_start)
-        max_evals = budget.max_evals if budget.max_evals is not None else 300_000
+        max_evals = resolve_max_evals(budget)
 
         k = problem.n_splits
         n_groups = problem.n_groups

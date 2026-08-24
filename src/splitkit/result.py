@@ -1,0 +1,340 @@
+"""What a split returns."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, field
+from functools import cached_property
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+from .dataset import GroupedDataset
+
+if TYPE_CHECKING:  # pragma: no cover
+    import pandas as pd
+
+__all__ = ["SplitMapping", "SplitResult"]
+
+
+class SplitMapping(Mapping):
+    """An ordered, name-keyed view over per-split arrays.
+
+    A plain dict would unpack to its *keys*, so ``train, val, test = result.groups``
+    would silently hand back three strings. This behaves as a mapping where that is
+    useful, and offers :meth:`astuple` for the unpacking people actually mean.
+    """
+
+    __slots__ = ("_data", "_names")
+
+    def __init__(self, names: tuple[str, ...], arrays: tuple[np.ndarray, ...]) -> None:
+        self._names = names
+        self._data = dict(zip(names, arrays, strict=True))
+
+    def __getitem__(self, key: str) -> np.ndarray:
+        try:
+            return self._data[key]
+        except KeyError:
+            raise KeyError(
+                f"No split named {key!r}. Available: {', '.join(self._names)}"
+            ) from None
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._names)
+
+    def __len__(self) -> int:
+        return len(self._names)
+
+    def __getattr__(self, name: str) -> np.ndarray:
+        try:
+            return self.__getitem__(name)
+        except KeyError as exc:
+            raise AttributeError(str(exc)) from None
+
+    def astuple(self) -> tuple[np.ndarray, ...]:
+        """Arrays in split order, for ``train, val, test = ...`` unpacking."""
+        return tuple(self._data[n] for n in self._names)
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        sizes = ", ".join(f"{n}={len(self._data[n])}" for n in self._names)
+        return f"SplitMapping({sizes})"
+
+
+@dataclass(frozen=True)
+class SplitResult:
+    """A completed split.
+
+    ``actual_counts`` is always recomputed from ``assignment`` rather than carried
+    over from a search's incrementally maintained state, so the reported numbers
+    describe the assignment you are actually given.
+    """
+
+    names:           tuple[str, ...]
+    assignment:      np.ndarray            # (G,) split index per group
+    ratios:          np.ndarray            # (K,) requested, normalised
+    target_counts:   np.ndarray            # (K, C')
+    actual_counts:   np.ndarray            # (K, C')
+    cost:            float
+    strategy:        str
+    dataset:         GroupedDataset = field(repr=False)
+    strategy_params: dict = field(default_factory=dict, repr=False)
+    seed:            int | None = None
+    n_evals:         int = 0
+    n_iterations:    int = 0
+    elapsed_time:    float = 0.0
+    converged:       bool = False
+    cost_history:    list = field(default_factory=list, repr=False)
+    lower_bound:     float | None = None
+    proved_optimal:  bool = False
+    dropped_classes: tuple[str, ...] = ()
+
+    @property
+    def n_splits(self) -> int:
+        return len(self.names)
+
+    # Group-level access
+    def mask(self, name: str) -> np.ndarray:
+        """(G,) boolean mask selecting the groups in ``name``."""
+        return self.assignment == self._index(name)
+
+    @cached_property
+    def groups(self) -> SplitMapping:
+        """Split name -> array of group ids."""
+        ids = self.dataset.group_ids
+        return SplitMapping(
+            self.names,
+            tuple(ids[self.assignment == s] for s in range(self.n_splits)),
+        )
+
+    # Item-level access
+    def item_mask(self, name: str) -> np.ndarray:
+        """(N,) boolean mask selecting the items in ``name``."""
+        # Validate the name before the provenance check, so a typo reports as a
+        # typo whether or not the dataset happens to carry item indices.
+        index = self._index(name)
+        return self._item_split() == index
+
+    @cached_property
+    def indices(self) -> SplitMapping:
+        """Split name -> array of item indices, for indexing your own data."""
+        item_split = self._item_split()
+        return SplitMapping(
+            self.names,
+            tuple(np.flatnonzero(item_split == s) for s in range(self.n_splits)),
+        )
+
+    def to_group_ids(self) -> dict[str, np.ndarray]:
+        """Plain dict of split name -> group ids."""
+        return dict(self.groups)
+
+    def to_indices(self) -> dict[str, np.ndarray]:
+        """Plain dict of split name -> item indices."""
+        return dict(self.indices)
+
+    # Quality
+    @property
+    def item_counts(self) -> np.ndarray:
+        """(K,) number of items in each split."""
+        sizes = self.dataset.group_sizes
+        return np.array(
+            [sizes[self.assignment == s].sum() for s in range(self.n_splits)]
+        )
+
+    @property
+    def achieved_ratios(self) -> np.ndarray:
+        """(K,) realised share of *items* per split.
+
+        The objective matches per-class counts, which is not the same thing as
+        matching item counts unless the data is one-hot. Surfacing this is how a
+        user notices the difference.
+        """
+        counts = self.item_counts
+        total = counts.sum()
+        return counts / total if total else np.zeros_like(counts)
+
+    @property
+    def relative_error(self) -> np.ndarray:
+        """(K, C') per-cell relative deviation from target."""
+        return np.abs(self.actual_counts - self.target_counts) / (
+            self.target_counts + 1.0
+        )
+
+    def worst_cell(self) -> tuple[str, str, float]:
+        """The ``(split, class, relative error)`` furthest from target."""
+        err = self.relative_error
+        s, c = np.unravel_index(int(np.argmax(err)), err.shape)
+        class_names = self._column_names()
+        return self.names[s], class_names[c], float(err[s, c])
+
+    def empty_classes(self) -> dict[str, tuple[str, ...]]:
+        """Classes entirely absent from a split, which breaks stratified metrics."""
+        class_names = self._column_names()
+        out = {}
+        for s, name in enumerate(self.names):
+            missing = tuple(
+                class_names[c]
+                for c in range(self.actual_counts.shape[1])
+                if self.actual_counts[s, c] == 0
+                and self.target_counts[s, c] > 0
+            )
+            if missing:
+                out[name] = missing
+        return out
+
+    def gap(self) -> float | None:
+        """Relative distance to a proven lower bound, when one is available."""
+        if self.lower_bound is None:
+            return None
+        return (self.cost - self.lower_bound) / max(abs(self.lower_bound), 1e-12)
+
+    # DataFrame helpers
+    def to_frame(self) -> pd.DataFrame:
+        """One row per group: id, split, size and per-class counts."""
+        pd = _require_pandas()
+        frame = pd.DataFrame(
+            {
+                "group_id": self.dataset.group_ids,
+                "split": [self.names[s] for s in self.assignment],
+                "size": self.dataset.group_sizes,
+            }
+        )
+        for j, cls in enumerate(self.dataset.class_names):
+            frame[cls] = self.dataset.group_vectors[:, j]
+        return frame
+
+    def counts_frame(self) -> pd.DataFrame:
+        """Target vs actual per (split, class), with the relative error."""
+        pd = _require_pandas()
+        class_names = self._column_names()
+        rows = []
+        for s, name in enumerate(self.names):
+            for c, cls in enumerate(class_names):
+                rows.append(
+                    {
+                        "split": name,
+                        "class": cls,
+                        "target": self.target_counts[s, c],
+                        "actual": self.actual_counts[s, c],
+                        "rel_error": self.relative_error[s, c],
+                    }
+                )
+        return pd.DataFrame(rows).set_index(["split", "class"])
+
+    def assign_column(
+        self,
+        df: pd.DataFrame,
+        group_col: str,
+        column: str = "split",
+        inplace: bool = False,
+    ) -> pd.DataFrame:
+        """Label each row of ``df`` with the split its group landed in."""
+        _require_pandas()
+        mapping = {}
+        for s, name in enumerate(self.names):
+            for gid in self.dataset.group_ids[self.assignment == s]:
+                mapping[gid] = name
+
+        target = df if inplace else df.copy()
+        target[column] = df[group_col].astype(str).map(mapping)
+        return target
+
+    # Reporting
+    def summary(self) -> str:
+        """Human-readable report of split quality."""
+        lines = [
+            "=" * 68,
+            f"Split: {self.dataset.name}  ({self.n_splits} splits, "
+            f"{self.dataset.n_groups:,} groups, {self.dataset.n_classes} classes)",
+            f"Strategy: {self.strategy}   cost: {self.cost:.6g}"
+            + ("   [PROVEN OPTIMAL]" if self.proved_optimal else ""),
+        ]
+        if self.lower_bound is not None and not self.proved_optimal:
+            lines.append(
+                f"Lower bound: {self.lower_bound:.6g}   gap: {self.gap():.2%}"
+            )
+        lines += [
+            f"Evaluations: {self.n_evals:,}   time: {self.elapsed_time:.2f}s",
+            "-" * 68,
+            f"{'split':<12}{'groups':>10}{'items':>12}"
+            f"{'requested':>12}{'achieved':>12}",
+        ]
+
+        achieved = self.achieved_ratios
+        items = self.item_counts
+        for s, name in enumerate(self.names):
+            lines.append(
+                f"{name:<12}{int((self.assignment == s).sum()):>10,}"
+                f"{int(items[s]):>12,}{self.ratios[s]:>11.1%}{achieved[s]:>12.1%}"
+            )
+
+        lines.append("-" * 68)
+        split_name, class_name, err = self.worst_cell()
+        lines.append(
+            f"Worst class balance: {class_name!r} in {split_name!r} "
+            f"off target by {err:.1%}"
+        )
+
+        empty = self.empty_classes()
+        if empty:
+            for name, classes in empty.items():
+                shown = ", ".join(classes[:5])
+                more = f" (+{len(classes) - 5} more)" if len(classes) > 5 else ""
+                lines.append(f"WARNING  {name!r} contains no: {shown}{more}")
+
+        if self.dropped_classes:
+            shown = ", ".join(self.dropped_classes[:5])
+            more = (
+                f" (+{len(self.dropped_classes) - 5} more)"
+                if len(self.dropped_classes) > 5
+                else ""
+            )
+            lines.append(
+                f"NOTE     {len(self.dropped_classes)} class(es) excluded from the "
+                f"objective as unstratifiable: {shown}{more}"
+            )
+            lines.append(
+                "         They occur in too few groups to appear in every split."
+            )
+        lines.append("=" * 68)
+        return "\n".join(lines)
+
+    def __str__(self) -> str:  # pragma: no cover - convenience
+        return self.summary()
+
+    # Internals
+    def _index(self, name: str) -> int:
+        try:
+            return self.names.index(name)
+        except ValueError:
+            raise KeyError(
+                f"No split named {name!r}. Available: {', '.join(self.names)}"
+            ) from None
+
+    def _column_names(self) -> tuple[str, ...]:
+        """Class names, plus the item-count pseudo-class when the problem used one."""
+        names = tuple(self.dataset.class_names)
+        if self.actual_counts.shape[1] == len(names) + 1:
+            return (*names, "<item count>")
+        return names
+
+    def _item_split(self) -> np.ndarray:
+        index = self.dataset.item_group_index
+        if index is None:
+            raise ValueError(
+                f"{self.dataset.name!r} was built from aggregated counts, so item "
+                f"indices are unavailable. Rebuild it with GroupedDataset."
+                f"from_arrays/from_dataframe to keep item provenance, or use "
+                f".groups to get group ids instead."
+            )
+        return self.assignment[index]
+
+
+def _require_pandas() -> Any:
+    try:
+        import pandas as pd
+    except ImportError as exc:  # pragma: no cover - exercised via extras
+        raise ImportError(
+            "This method requires pandas. "
+            "Install it with: pip install 'splitkit[pandas]'"
+        ) from exc
+    return pd

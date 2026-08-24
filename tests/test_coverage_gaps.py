@@ -189,3 +189,44 @@ class TestElapsedSince:
 
         t0 = time.perf_counter()
         assert elapsed_since(t0) >= 0.0
+
+
+class TestResolveMaxEvals:
+    def test_explicit_evals_win(self):
+        from splitkit.strategies.base import resolve_max_evals
+
+        assert resolve_max_evals(Budget(max_evals=123)) == 123
+
+    def test_time_only_is_effectively_unbounded(self):
+        """A fast machine must not stop early with time left on the clock."""
+        from splitkit.strategies.base import DEFAULT_MAX_EVALS, resolve_max_evals
+
+        assert resolve_max_evals(Budget(time_limit=1.0)) > DEFAULT_MAX_EVALS
+
+    def test_falls_back_to_the_default(self):
+        from splitkit.strategies.base import DEFAULT_MAX_EVALS, resolve_max_evals
+
+        assert resolve_max_evals(Budget()) == DEFAULT_MAX_EVALS
+
+
+class TestAnnealingScheduleValidation:
+    @pytest.mark.parametrize(
+        "kwargs, match",
+        [
+            ({"cooling_rate": "fast"}, "or 'auto'"),
+            ({"anneal_cycles": 0}, "anneal_cycles"),
+            ({"anneal_cycles": -1}, "anneal_cycles"),
+        ],
+    )
+    def test_rejects_bad_schedule(self, kwargs, match):
+        with pytest.raises(ValueError, match=match):
+            get_strategy("annealing", **kwargs)
+
+    def test_auto_rate_shrinks_with_budget(self):
+        """A smaller budget must cool faster, or it never leaves exploration."""
+        sa = get_strategy("annealing")
+        assert sa._resolve_cooling_rate(2_000) < sa._resolve_cooling_rate(300_000)
+
+    def test_explicit_rate_is_used_verbatim(self):
+        sa = get_strategy("annealing", cooling_rate=0.9999)
+        assert sa._resolve_cooling_rate(2_000) == 0.9999

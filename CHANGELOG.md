@@ -45,6 +45,24 @@ group-aware stratified splitting) and is being rebuilt as an installable package
 - Warm-start support (`Strategy.run(..., warm_start=...)`).
 - Arbitrary **K splits**. Split counts are no longer hardcoded to three; ratios
   may be any length, with conventional names for K=2/K=3 and `split_i` beyond.
+- **`splitkit.split()` and `splitkit.evaluate()`**, the public entry points.
+  `split()` accepts a `GroupedDataset`, a DataFrame plus column names, or raw
+  `groups=`/`y=` arrays, and takes ratios either as a mapping
+  (`{"train": 0.8, "test": 0.2}`) or a bare sequence. `evaluate()` scores an
+  externally produced assignment on the same objective, so a split from anywhere
+  else can be compared on equal terms.
+- **`SplitResult`**, with `.indices` for item positions, `.groups` for group ids,
+  `.to_frame()` / `.counts_frame()` / `.assign_column()` for pandas users, and
+  `.summary()` for a quality report. `actual_counts` is always recomputed from the
+  returned assignment, so no incrementally maintained accumulator can drift into
+  the reported numbers.
+- **`SplitMapping`**, an ordered name-keyed view. A plain dict would unpack to its
+  *keys*, so `train, val, test = result.groups` would silently yield three
+  strings; `.astuple()` gives the arrays people mean.
+- Split quality reporting: `achieved_ratios` (the realised **item** share, which
+  differs from the class-count objective on non-one-hot data), `worst_cell()`,
+  `empty_classes()`, and the list of classes excluded as unstratifiable — which
+  the previous implementation silently zero-weighted without telling anyone.
 
 ### Changed
 
@@ -54,6 +72,23 @@ group-aware stratified splitting) and is being rebuilt as an installable package
 - `Optimizer` (ABC) replaced by `Strategy`, returning an internal `Outcome`.
 - Simulated annealing's default `initial_temp` is now `100.0` (was `10.0`),
   matching the value the grid search selected.
+- **Simulated annealing's cooling schedule now fits the budget** (`cooling_rate="auto"`,
+  the new default). A fixed rate silently assumes a particular budget: 0.9999
+  needs roughly 300k steps to anneal, so a shorter run never left its exploration
+  phase and returned something close to random. Passing an explicit
+  `cooling_rate` keeps the old geometric behaviour exactly.
+
+  Measured on a 60-group, 2-class patient dataset (seed 42):
+
+  | evaluations | `"auto"` | fixed `0.9999` | random search |
+  |---|---|---|---|
+  | 2,000 | **0.062** | 2.435 | 0.078 |
+  | 10,000 | **0.000** | 2.435 | 0.031 |
+  | 50,000 | **0.000** | 0.450 | 0.016 |
+
+  On a 1,000-group instance the same change takes the cost at 20k evaluations
+  from 0.960 to 0.021. With only a wall-clock budget the schedule is calibrated
+  once from observed throughput, since there is no evaluation count to fit to.
 - SGKF fold-to-split apportionment now uses the largest-remainder method. The
   previous loop repeatedly adjusted the same index and could leave a split with
   no folds at all for skewed ratios.

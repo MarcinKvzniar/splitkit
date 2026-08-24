@@ -127,16 +127,34 @@ class TestContract:
 class TestSearchQuality:
     """Directed strategies must actually beat undirected sampling."""
 
-    @pytest.mark.parametrize("name", ["annealing", "evolution"])
-    def test_beats_random_search(self, name, dense):
-        problem = SplitProblem.build(dense, (0.6, 0.2, 0.2))
-        budget = Budget(max_evals=4000)
+    @pytest.fixture
+    def searchable(self) -> SplitProblem:
+        """Large enough that sampling cannot cover it, with budget to search it.
 
-        directed = get_strategy(name).run(problem, budget, np.random.default_rng(0))
+        The claim "directed beats random" is only well posed in that regime: on a
+        10-group instance the whole space fits in a few thousand draws, and with
+        only a handful of moves per group a local search has not organised
+        anything yet.
+        """
+        rng = np.random.default_rng(1)
+        data = make_dataset(rng.integers(1, 30, size=(100, 6)).astype(float))
+        return SplitProblem.build(data, (0.6, 0.2, 0.2))
+
+    @pytest.mark.parametrize("name", ["annealing", "evolution"])
+    def test_beats_random_search(self, name, searchable):
+        budget = Budget(max_evals=8000)
+        directed = get_strategy(name).run(searchable, budget, np.random.default_rng(0))
         undirected = get_strategy("random").run(
-            problem, budget, np.random.default_rng(0)
+            searchable, budget, np.random.default_rng(0)
         )
-        assert directed.cost <= undirected.cost
+        assert directed.cost < undirected.cost
+
+    def test_annealing_margin_is_substantial(self, searchable):
+        """Not merely better -- decisively so, or the search is not earning its cost."""
+        budget = Budget(max_evals=8000)
+        sa = get_strategy("annealing").run(searchable, budget, np.random.default_rng(0))
+        rs = get_strategy("random").run(searchable, budget, np.random.default_rng(0))
+        assert sa.cost < rs.cost / 1.5
 
     @pytest.mark.parametrize("name", ["annealing", "evolution", "random"])
     def test_more_budget_never_hurts(self, name, dense):

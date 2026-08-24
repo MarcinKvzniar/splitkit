@@ -7,7 +7,7 @@ import time
 import numpy as np
 
 from ..problem import Budget, SplitProblem
-from .base import Outcome, Strategy
+from .base import Outcome, Strategy, resolve_max_evals
 from .registry import register_strategy
 
 #: How often to consult the wall clock, in evaluations.
@@ -34,7 +34,7 @@ class RandomSearch(Strategy):
     ) -> Outcome:
         t_start = time.perf_counter()
         deadline = budget.deadline_from(t_start)
-        max_evals = budget.max_evals if budget.max_evals is not None else 300_000
+        max_evals = resolve_max_evals(budget)
 
         best_assignment = problem.random_assignment(rng)
         best_cost = problem.evaluate(best_assignment)
