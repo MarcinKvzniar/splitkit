@@ -35,10 +35,8 @@ dependencies = ["numpy>=1.23"]
 pandas  = ["pandas>=1.5"]
 sklearn = ["scikit-learn>=1.1"]
 viz     = ["matplotlib>=3.6"]
-exact   = ["ortools>=9.7"]
-milp    = ["scipy>=1.9"]
-cbc     = ["pulp>=2.7"]
-all     = ["splitkit[pandas,sklearn,viz,exact,milp]"]
+exact   = ["scipy>=1.10"]
+all     = ["splitkit[pandas,sklearn,viz,exact]"]
 
 [project.urls]
 Homepage      = "https://github.com/MarcinKvzniar/splitkit"
@@ -78,7 +76,7 @@ testpaths = ["tests"]
 addopts = "--strict-markers"
 markers = [
     "slow: long-running tests",
-    "exact: requires an exact solver backend (ortools/scipy/pulp)",
+    "exact: requires SciPy (the exact extra)",
     "sklearn: requires scikit-learn",
 ]
 
@@ -109,5 +107,5 @@ files = ["src/splitkit"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["pandas.*", "sklearn.*", "matplotlib.*", "ortools.*", "scipy.*", "pulp.*"]
+module = ["pandas.*", "sklearn.*", "matplotlib.*", "scipy.*"]
 ignore_missing_imports = true

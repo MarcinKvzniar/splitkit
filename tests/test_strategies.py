@@ -18,7 +18,7 @@ from splitkit.strategies import Strategy, get_strategy, list_strategies
 from splitkit.strategies.registry import _REGISTRY
 
 #: Strategies that need an optional dependency are skipped when it is absent.
-_EXTRA_MODULES = {"sklearn": "sklearn"}
+_EXTRA_MODULES = {"sklearn": "sklearn", "exact": "scipy"}
 
 
 def needs_skip(name: str) -> str | None:

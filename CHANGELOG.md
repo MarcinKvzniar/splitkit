@@ -13,7 +13,7 @@ group-aware stratified splitting) and is being rebuilt as an installable package
 
 - Installable `splitkit` package under `src/splitkit/`, MIT licensed, typed
   (`py.typed`), with **numpy as the only required dependency**. Everything else
-  (pandas, scikit-learn, matplotlib, OR-Tools, SciPy, PuLP) is an optional extra.
+  (pandas, scikit-learn, matplotlib, SciPy) is an optional extra.
 - `GroupedDataset`: validated, immutable dataset container replacing
   `DatasetGroups`, with `class_group_counts` and `is_onehot`.
 - `splitkit.io`: pickle-free `.npz` persistence. Loading never enables
@@ -41,6 +41,14 @@ group-aware stratified splitting) and is being rebuilt as an installable package
 - `splitkit.objectives`: pluggable objective interface, with `wmape` as the
   default. Objectives are *prepared* against a fixed target so the constant part
   of the formula is computed once instead of per evaluation.
+- **Exact MILP strategy** (`strategy="exact"`, `pip install 'splitkit[exact]'`).
+  Solves the split with SciPy's HiGHS solver and reports a proven optimum, or the
+  best solution plus a lower bound when the time limit runs out. Count constraints
+  are scaled by their targets, so pixel-scale counts stay within solver
+  tolerances. With a 20 s limit it beat 300k-evaluation annealing on 7 of 8
+  benchmark datasets (for example 1.01 vs 1.81 on `synth_few_groups`, and
+  proven optimal on `synth_concentrated` in 0.2 s). Practical up to a few
+  thousand groups; beyond that it warns and falls back to annealing.
 - Strategy registry: `get_strategy()`, `list_strategies()`, `register_strategy()`.
 - Warm-start support (`Strategy.run(..., warm_start=...)`).
 - Arbitrary **K splits**. Split counts are no longer hardcoded to three; ratios

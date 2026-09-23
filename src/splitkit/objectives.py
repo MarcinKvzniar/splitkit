@@ -8,6 +8,7 @@ import numpy as np
 
 __all__ = [
     "OBJECTIVES",
+    "LinearObjective",
     "Objective",
     "PreparedObjective",
     "WeightedMAPE",
@@ -35,6 +36,14 @@ class PreparedObjective(Protocol):
 
 
 @runtime_checkable
+class LinearObjective(PreparedObjective, Protocol):
+    """A prepared objective equal to ``sum(cell_weights * |counts - target|)``."""
+
+    cell_weights: np.ndarray
+    target: np.ndarray
+
+
+@runtime_checkable
 class Objective(Protocol):
     """Factory for a :class:`PreparedObjective`."""
 
@@ -58,6 +67,14 @@ class _PreparedWeightedMAPE:
         self._target = target
         self._weights = weights
         self._denom = target + eps
+
+    @property
+    def target(self) -> np.ndarray:
+        return self._target
+
+    @property
+    def cell_weights(self) -> np.ndarray:
+        return np.asarray(self._weights / self._denom)
 
     def total(self, counts: np.ndarray) -> float:
         rel_err = np.abs(counts - self._target) / self._denom
