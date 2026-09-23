@@ -63,6 +63,11 @@ class TestSizeColumnLabelling:
         frame_classes = set(r.counts_frame().index.get_level_values("class"))
         assert "<item count>" in frame_classes
 
+    def test_absent_when_disabled(self, soft_counts):
+        r = split(soft_counts, (0.5, 0.5), size_weight=0, max_evals=500, seed=0)
+        _, class_name, _ = r.worst_cell()
+        assert class_name in soft_counts.class_names
+
     def test_worst_cell_can_name_the_size_column(self, soft_counts):
         r = split(soft_counts, (0.5, 0.5), size_weight=1.0, max_evals=500, seed=0)
         _, class_name, _ = r.worst_cell()

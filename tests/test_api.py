@@ -344,6 +344,19 @@ class TestTopLevelNamespace:
         assert splitkit.GroupedDataset is GroupedDataset
 
 
+class TestDefaultObjective:
+    def test_item_ratios_held_under_heavy_imbalance(self):
+        """Inverse-frequency weights make the majority class nearly free to move."""
+        r = split(splitkit.from_preset("heavy_imbalance"), max_evals=20_000, seed=0)
+        np.testing.assert_allclose(r.achieved_ratios, r.ratios, atol=0.02)
+
+    def test_without_size_term_item_ratios_drift(self):
+        r = split(
+            splitkit.from_preset("heavy_imbalance"), size_weight=0, max_evals=20_000, seed=0
+        )
+        assert np.abs(r.achieved_ratios - r.ratios).max() > 0.02
+
+
 class TestDefaultBudget:
     def test_applies_when_no_stop_condition_given(self, tiny):
         """With neither max_evals nor time_budget, a default budget applies."""

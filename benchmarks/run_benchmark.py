@@ -32,7 +32,7 @@ N_RUNS = 10
 SEEDS = [42 + i for i in range(N_RUNS)]
 
 _OPTIMIZERS = [
-    ("SA", SimulatedAnnealing, dict(initial_temp=100.0, cooling_rate=0.9999, min_temp=1e-4)),
+    ("SA", SimulatedAnnealing, dict()),
     ("DE", DifferentialEvolution, dict(strategy="DE/best/2/exp", pop_size=50, f_weight=0.9, crossover_prob=0.5)),
     ("RS", RandomSearch, dict()),
     ("SGKF", SGKFBaseline, dict()),

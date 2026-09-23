@@ -132,9 +132,9 @@ class SplitProblem:
         names: Sequence[str] | None = None,
         objective: str | Objective = "wmape",
         class_weights: str | np.ndarray = "inverse_frequency",
-        size_weight: float | str = 0.0,
+        size_weight: float = 1.0,
         unstratifiable: str = "drop",
-        weight_normalize: bool = False,
+        weight_normalize: bool = True,
         weight_clip: float | None = None,
         min_groups_per_class: int | None = None,
     ) -> SplitProblem:
@@ -145,8 +145,9 @@ class SplitProblem:
         class_weights
             ``"inverse_frequency"``, ``"uniform"`` or an explicit ``(C,)`` array.
         size_weight
-            Weight of an extra item-count column. ``"auto"`` enables it only for
-            non-one-hot data, where matching class counts does not match item counts.
+            Weight of an item-count column, relative to the mean class weight. Keeps
+            item ratios on target when class counts alone do not (majority classes
+            carry near-zero inverse-frequency weight). ``0`` disables it.
         unstratifiable
             ``"drop"`` zero-weights classes present in fewer than K groups;
             ``"keep"`` scores them anyway.
@@ -225,9 +226,6 @@ class SplitProblem:
             weights = weights / weights[retained].mean()
 
         vectors = data.group_vectors
-        if size_weight == "auto":
-            size_weight = 0.0 if data.is_onehot else 1.0
-        size_weight = float(size_weight)
         if size_weight < 0:
             raise ValueError(f"size_weight must be non-negative, got {size_weight}.")
 

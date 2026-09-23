@@ -107,13 +107,15 @@ class TestEvolutionVariants:
         assert out.converged
         assert out.cost == pytest.approx(problem.evaluate(out.assignment), rel=1e-9)
 
-    def test_stops_on_time_limit(self, problem):
+    def test_stops_on_time_limit(self):
+        data = make_dataset(np.random.default_rng(0).integers(1, 50, (600, 12)))
         out = get_strategy("evolution", pop_size=10).run(
-            problem,
+            SplitProblem.build(data, (0.7, 0.15, 0.15)),
             Budget(max_evals=10**9, time_limit=0.3),
             np.random.default_rng(0),
         )
         assert out.n_evals < 10**9
+        assert not out.converged
 
 
 class TestSGKFDownscale:

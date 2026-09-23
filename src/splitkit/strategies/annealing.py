@@ -37,7 +37,7 @@ class SimulatedAnnealing(Strategy):
 
     def __init__(
         self,
-        initial_temp: float = 100.0,
+        initial_temp: float = 1.0,
         cooling_rate: float | str = "auto",
         min_temp: float = 1e-4,
         anneal_cycles: float = 2.0,

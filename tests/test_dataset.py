@@ -98,16 +98,6 @@ class TestIsOnehot:
         """Pixel counts against tile counts: different units entirely."""
         assert soft_counts.is_onehot is False
 
-    def test_drives_size_weight_auto(self, tiny, soft_counts):
-        from splitkit.problem import SplitProblem
-
-        assert not SplitProblem.build(
-            tiny, (0.5, 0.5), size_weight="auto"
-        ).has_size_column
-        assert SplitProblem.build(
-            soft_counts, (0.5, 0.5), size_weight="auto"
-        ).has_size_column
-
 
 class TestSummary:
     def test_mentions_key_facts(self, tiny):

@@ -70,8 +70,30 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   `(0.7, 0.15, 0.15)` express the same intent. Non-finite, zero and negative
   ratios still raise.
 - `Optimizer` (ABC) replaced by `Strategy`, returning an internal `Outcome`.
-- Simulated annealing's default `initial_temp` is now `100.0` (was `10.0`),
-  matching the value the grid search selected.
+- **Class weights are normalised to mean 1 by default** (`weight_normalize=True`).
+  The original inverse-frequency weights were documented as mean-normalised but
+  never were, so costs were incomparable across datasets and the annealing
+  temperature meant something different on every dataset.
+- **Item counts are part of the objective by default** (`size_weight=1.0`).
+  Inverse-frequency weights make a majority class nearly free to move, so class
+  counts alone let item ratios drift badly even on one-hot data. `size_weight=0`
+  restores class-only matching.
+
+  Worst per-split item-ratio error against a 70/15/15 target (annealing, 40k
+  evaluations, mean of 3 seeds), old defaults vs new:
+
+  | dataset | old | new |
+  |---|---|---|
+  | ISIC 2020 (98% one class) | 0.81 pp | 0.00 pp |
+  | BCSS (pixel vs tile counts) | 4.42 pp | 0.02 pp |
+  | synth_heavy_imbalance | 13.23 pp | 0.30 pp |
+  | synth_concentrated | 0.85 pp | 0.49 pp |
+
+  Class-balance cost is equal or better on 6 of 9 benchmark datasets, and drops
+  from 4.78 to 0.98 on CelebA.
+- Simulated annealing's default `initial_temp` is now `1.0` (was `10.0`), the scale
+  of a typical move under normalised weights. At 300k evaluations it matches or
+  beats `100.0` on 7 of 9 datasets.
 - **Simulated annealing's cooling schedule now fits the budget** (`cooling_rate="auto"`,
   the new default). A fixed rate silently assumes a particular budget: 0.9999
   needs roughly 300k steps to anneal, so a shorter run never left its exploration
@@ -146,30 +168,3 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   recomputation with true O(C) deltas.
 - Builder tests assert the no-leakage guarantee end to end: every item of a group
   lands in one split, and the returned item indices partition the dataset exactly.
-
-### Notes on correctness
-
-Two behaviour switches are implemented but **not yet enabled by default**, so
-that the refactor could be verified as behaviour-preserving against the original
-benchmark numbers. They become defaults in a later step:
-
-- `weight_normalize` — the original inverse-frequency weights were documented as
-  "mean-normalised to 1" but never normalised, leaving costs incomparable across
-  datasets.
-- `size_weight` — matching per-class counts implies matching *item* counts only
-  for one-hot single-label data.
-
-Measured effect of `size_weight` on the achieved train/val/test **item** ratio
-against a 70/15/15 target (annealing, 40k evaluations, seed 42):
-
-| dataset | `size_weight=0` | `size_weight="auto"` |
-|---|---|---|
-| BCSS (pixel counts vs tile counts) | 0.551 / 0.203 / 0.245 — **14.9 pp error** | 0.696 / 0.152 / 0.153 — 0.4 pp error |
-| CelebA (40 binary attributes) | 0.703 / 0.149 / 0.148 — 0.25 pp error | 0.703 / 0.149 / 0.148 — 0.25 pp error |
-
-The failure mode is severe but driven by **unit mismatch** (pixels vs tiles),
-not by multi-label targets as such: CelebA's attribute mass tracks image count
-closely enough (r = 0.90) that class counts alone pin the item counts. BCSS
-correlates similarly (r = 0.86) yet still fails badly, so the correlation is not
-by itself a safe predictor — which is why `"auto"` keys off `is_onehot` rather
-than a heuristic threshold.

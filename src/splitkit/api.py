@@ -77,9 +77,9 @@ def split(
     strategy: str | Strategy = "annealing",
     objective: str | Objective = "wmape",
     class_weights: str | np.ndarray = "inverse_frequency",
-    size_weight: float | str = 0.0,
+    size_weight: float = 1.0,
     unstratifiable: str = "drop",
-    weight_normalize: bool = False,
+    weight_normalize: bool = True,
     weight_clip: float | None = None,
     max_evals: int | None = None,
     time_budget: float | None = None,
@@ -190,9 +190,9 @@ def evaluate(
     names: Sequence[str] | None = None,
     objective: str | Objective = "wmape",
     class_weights: str | np.ndarray = "inverse_frequency",
-    size_weight: float | str = 0.0,
+    size_weight: float = 1.0,
     unstratifiable: str = "drop",
-    weight_normalize: bool = False,
+    weight_normalize: bool = True,
     weight_clip: float | None = None,
 ) -> float:
     """Score an externally produced assignment on the objective :func:`split` minimises."""

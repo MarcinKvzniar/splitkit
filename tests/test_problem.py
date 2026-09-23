@@ -48,18 +48,18 @@ class TestDefaultNames:
 
 class TestTargets:
     def test_target_is_counts_times_ratio(self, tiny):
-        p = SplitProblem.build(tiny, (0.5, 0.25, 0.25))
+        p = SplitProblem.build(tiny, (0.5, 0.25, 0.25), size_weight=0)
         totals = tiny.global_class_counts
         for s, r in enumerate((0.5, 0.25, 0.25)):
             np.testing.assert_allclose(p.target[s], totals * r)
 
     def test_target_columns_sum_to_totals(self, tiny):
-        p = SplitProblem.build(tiny, (0.7, 0.15, 0.15))
+        p = SplitProblem.build(tiny, (0.7, 0.15, 0.15), size_weight=0)
         np.testing.assert_allclose(p.target.sum(axis=0), tiny.global_class_counts)
 
     @pytest.mark.parametrize("k", [2, 3, 4, 5, 6, 8])
     def test_generalizes_to_k_splits(self, dense, k):
-        p = SplitProblem.build(dense, [1 / k] * k)
+        p = SplitProblem.build(dense, [1 / k] * k, size_weight=0)
         assert p.n_splits == k
         assert p.target.shape == (k, dense.n_classes)
         assert len(p.names) == k
@@ -120,8 +120,13 @@ class TestWeights:
 
     def test_explicit_weights_used(self, tiny):
         w = np.array([1.0, 2.0, 3.0])
-        p = SplitProblem.build(tiny, (0.5, 0.5), class_weights=w)
+        p = SplitProblem.build(tiny, (0.5, 0.5), class_weights=w, weight_normalize=False, size_weight=0)
         np.testing.assert_allclose(p.weights, w)
+
+    def test_normalized_by_default(self, tiny):
+        w = np.array([1.0, 2.0, 3.0])
+        p = SplitProblem.build(tiny, (0.5, 0.5), class_weights=w, size_weight=0)
+        np.testing.assert_allclose(p.weights, w / w.mean())
 
     def test_explicit_weights_shape_checked(self, tiny):
         with pytest.raises(ValueError, match="shape"):
@@ -190,8 +195,11 @@ class TestUnstratifiable:
 
 
 class TestSizeWeight:
-    def test_off_by_default(self, multilabel):
-        p = SplitProblem.build(multilabel, (0.5, 0.5))
+    def test_on_by_default(self, tiny):
+        assert SplitProblem.build(tiny, (0.5, 0.5)).has_size_column is True
+
+    def test_zero_disables(self, multilabel):
+        p = SplitProblem.build(multilabel, (0.5, 0.5), size_weight=0)
         assert p.has_size_column is False
         assert p.n_columns == multilabel.n_classes
 
@@ -200,16 +208,6 @@ class TestSizeWeight:
         assert p.has_size_column is True
         assert p.n_columns == multilabel.n_classes + 1
         np.testing.assert_allclose(p.vectors[:, -1], multilabel.group_sizes)
-
-    def test_auto_off_for_onehot(self, tiny):
-        assert tiny.is_onehot
-        p = SplitProblem.build(tiny, (0.5, 0.5), size_weight="auto")
-        assert p.has_size_column is False
-
-    def test_auto_on_when_units_differ(self, soft_counts):
-        assert not soft_counts.is_onehot
-        p = SplitProblem.build(soft_counts, (0.5, 0.5), size_weight="auto")
-        assert p.has_size_column is True
 
     def test_negative_rejected(self, tiny):
         with pytest.raises(ValueError, match="non-negative"):
