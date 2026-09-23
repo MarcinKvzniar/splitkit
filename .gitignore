@@ -38,3 +38,6 @@ dist/
 .coverage.*
 htmlcov/
 .pytest_cache/
+.benchmarks/
+.ruff_cache/
+.mypy_cache/

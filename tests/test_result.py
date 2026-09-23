@@ -57,6 +57,7 @@ class TestLowerBoundReporting:
 class TestSizeColumnLabelling:
     def test_pseudo_class_named_in_reports(self, soft_counts):
         """The item-count column is not a real class and must not look like one."""
+        pytest.importorskip("pandas")
         r = split(soft_counts, (0.5, 0.5), size_weight=1.0, max_evals=500, seed=0)
         assert r.actual_counts.shape[1] == soft_counts.n_classes + 1
 

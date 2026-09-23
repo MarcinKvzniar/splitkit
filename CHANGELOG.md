@@ -181,8 +181,11 @@ group-aware stratified splitting) and is being rebuilt as an installable package
 
 ### Testing
 
-- First test suite for the project: 281 tests, 100% statement coverage of
-  `src/splitkit`, running in about 8 seconds.
+- First test suite for the project: 412 tests, 100% statement coverage of
+  `src/splitkit`, running in about 15 seconds.
+- GitHub Actions CI: ruff and mypy; the suite on Python 3.10–3.14 with numpy
+  only, where tests needing an extra skip cleanly; the full suite with every
+  extra and a 100% coverage gate; and a build checked with `twine check`.
 - Strategy tests are parametrized over the registry, so a newly registered
   strategy is held to the full contract automatically.
 - A brute-force oracle enumerates every assignment for tiny instances, giving

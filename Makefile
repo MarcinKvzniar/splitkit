@@ -1,4 +1,4 @@
-.PHONY: lint fix format
+.PHONY: lint fix typecheck test check
 
 lint:
 	uv run ruff check .
@@ -6,5 +6,10 @@ lint:
 fix:
 	uv run ruff check --fix .
 
-format:
-	uv run ruff format .
+typecheck:
+	uv run mypy
+
+test:
+	uv run pytest --cov=splitkit --cov-report=term-missing
+
+check: lint typecheck test
