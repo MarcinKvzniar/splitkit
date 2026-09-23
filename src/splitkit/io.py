@@ -1,13 +1,10 @@
-"""Pickle-free persistence for :class:`~splitkit.dataset.GroupedDataset`.
-
-Datasets are stored as compressed ``.npz``. Loading never enables ``allow_pickle``,
-so opening a splitkit dataset file can never execute code.
-"""
+"""Pickle-free ``.npz`` persistence; loading never enables ``allow_pickle``."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -25,7 +22,7 @@ def save_npz(data: GroupedDataset, path: str | Path) -> Path:
         path = path.with_suffix(".npz")
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    arrays = {
+    arrays: dict[str, Any] = {
         "group_vectors": np.ascontiguousarray(data.group_vectors, dtype=np.float64),
         "group_sizes": np.ascontiguousarray(data.group_sizes, dtype=np.float64),
         "group_ids": np.asarray(data.group_ids, dtype=np.str_),
@@ -49,7 +46,7 @@ def load_npz(path: str | Path) -> GroupedDataset:
     with np.load(path, allow_pickle=False) as z:
         try:
             meta = json.loads(str(z["meta"]))
-        except KeyError as exc:  # pragma: no cover - corrupt file
+        except KeyError as exc:  # pragma: no cover
             raise ValueError(f"{path} is not a splitkit dataset file.") from exc
 
         version = meta.get("format")

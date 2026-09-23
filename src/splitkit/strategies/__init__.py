@@ -1,9 +1,4 @@
-"""Split strategies and their registry.
-
-Every strategy implements :class:`Strategy`, receives the same
-:class:`~splitkit.problem.SplitProblem` and :class:`~splitkit.problem.Budget`, and
-returns an :class:`Outcome`, so results are directly comparable.
-"""
+"""Split strategies and their registry."""
 
 from __future__ import annotations
 

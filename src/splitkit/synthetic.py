@@ -1,14 +1,8 @@
-"""Synthetic grouped datasets for testing, benchmarking and demos.
-
-Datasets vary along three axes that between them determine how hard a grouped
-stratified split is:
-
-  - search space size    (``n_groups``)
-  - class imbalance      (power-law exponent over class sizes)
-  - class concentration  (how many groups each class appears in)
-"""
+"""Synthetic grouped datasets varying size, imbalance and class concentration."""
 
 from __future__ import annotations
+
+from typing import Any
 
 import numpy as np
 
@@ -18,17 +12,13 @@ __all__ = ["PRESETS", "from_preset", "list_presets", "make_synthetic"]
 
 
 def _class_counts(n_classes: int, total: int, exponent: float) -> np.ndarray:
-    """Power-law class sizes.
-
-    exponent=0 is perfectly balanced; 1 gives roughly 10:1 across 10 classes;
-    2 gives roughly 100:1.
-    """
+    """Power-law class sizes; exponent 0 is balanced, 2 is roughly 100:1."""
     ranks = np.arange(1, n_classes + 1, dtype=float)
     freqs = 1.0 / np.power(ranks, exponent)
     freqs /= freqs.sum()
     counts = np.maximum(1, np.round(freqs * total).astype(int))
     counts[0] += total - counts.sum()
-    return counts
+    return np.asarray(counts)
 
 
 def make_synthetic(
@@ -42,28 +32,16 @@ def make_synthetic(
     name: str = "synthetic",
     seed: int | None = 0,
 ) -> GroupedDataset:
-    """Build one synthetic :class:`GroupedDataset`.
+    """Build a synthetic :class:`GroupedDataset`.
 
     Parameters
     ----------
-    n_groups
-        Number of indivisible groups.
-    n_classes
-        Number of class labels.
-    total_items
-        Total sample count across all groups and classes.
     imbalance
-        Power-law exponent for the class-count distribution
-        (0 = balanced, 1 = mild, 2 = heavy).
+        Power-law exponent of class sizes (0 balanced, 1 mild, 2 heavy).
     groups_per_class
-        How many groups each class is scattered across. Low values concentrate a
-        class into few groups, which makes it hard to stratify; high values spread
-        it out.
+        Number of groups each class is spread across; low values are hard to stratify.
     dirichlet_alpha
-        Concentration for within-class group sizes. Below 1 gives very unequal
-        group sizes; far above 1 gives near-uniform ones.
-    seed
-        RNG seed.
+        Within-class group size concentration; below 1 gives very unequal groups.
     """
     if n_groups < 1:
         raise ValueError(f"n_groups must be positive, got {n_groups}.")
@@ -83,7 +61,6 @@ def make_synthetic(
         counts[-1] = max(0, total_c - counts[:-1].sum())
         group_vectors[chosen, c] += counts
 
-    # Drop groups that ended up empty.
     sizes = group_vectors.sum(axis=1)
     keep = sizes > 0
     group_vectors = group_vectors[keep]
@@ -99,8 +76,7 @@ def make_synthetic(
     )
 
 
-#: Named configurations covering distinct edge-case topologies.
-PRESETS: dict[str, dict] = {
+PRESETS: dict[str, dict[str, Any]] = {
     "easy_balanced": dict(
         n_groups=500, n_classes=5, total_items=10_000,
         imbalance=0.0, groups_per_class=500, dirichlet_alpha=10.0,

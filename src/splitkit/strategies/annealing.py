@@ -11,38 +11,25 @@ from ..problem import Budget, SplitProblem
 from .base import Outcome, Strategy, resolve_max_evals
 from .registry import register_strategy
 
-#: How often to consult the wall clock, in evaluations.
 _TIME_CHECK_INTERVAL = 4096
 
 
 @register_strategy
 class SimulatedAnnealing(Strategy):
-    """Single-trajectory search with Metropolis acceptance and reheating.
+    """Single-group moves with Metropolis acceptance, geometric cooling and reheating.
 
-    State is the assignment vector; a neighbour moves one group to a different
-    split. Accepting uphill moves with probability ``exp(-delta / T)`` lets the
-    search escape the local optima that a pure descent gets stuck in, and the
-    temperature decays geometrically so the walk anneals into exploitation.
-
-    When the temperature collapses below ``min_temp`` the search reheats and
-    restarts from the best assignment found so far, which turns the tail of a long
-    budget into repeated focused dives rather than a frozen random walk.
+    Below ``min_temp`` the search reheats from the best assignment found so far.
 
     Parameters
     ----------
     initial_temp
-        Starting temperature. Should be on the order of a typical cost delta.
+        Starting temperature, on the order of a typical cost delta.
     cooling_rate
-        Per-step multiplier in (0, 1), or ``"auto"`` (the default) to fit the
-        schedule to the budget. A fixed rate silently assumes a particular budget:
-        0.9999 needs roughly 300k steps to anneal, so on a 5k-step run the search
-        never leaves its exploration phase and returns something close to random.
+        Per-step multiplier in (0, 1), or ``"auto"`` to fit the schedule to the budget.
     min_temp
         Reheat trigger; must be below ``initial_temp``.
     anneal_cycles
-        How many times ``"auto"`` should cool from ``initial_temp`` to ``min_temp``
-        across the budget. Each cycle ends in a reheat from the best assignment
-        found, so more cycles means more, shorter dives.
+        Number of full cool-downs ``"auto"`` fits into the budget.
     """
 
     name = "annealing"
@@ -82,12 +69,7 @@ class SimulatedAnnealing(Strategy):
         self.anneal_cycles = anneal_cycles
 
     def _resolve_cooling_rate(self, max_evals: int) -> float:
-        """Per-step multiplier, fitted to the budget when set to "auto".
-
-        Solves ``rate ** (max_evals / cycles) == min_temp / initial_temp`` so the
-        temperature completes the requested number of anneal cycles in the budget
-        actually available, instead of assuming one.
-        """
+        # "auto" solves rate ** (max_evals / cycles) == min_temp / initial_temp.
         if self.cooling_rate != "auto":
             return float(self.cooling_rate)
         steps = max(1.0, max_evals / self.anneal_cycles)
@@ -109,12 +91,10 @@ class SimulatedAnnealing(Strategy):
         vectors = problem.vectors
         total = problem.prepared.total
         cooling_rate = self._resolve_cooling_rate(max_evals)
-        # With only a wall-clock budget there is no evaluation count to fit the
-        # schedule to, so calibrate once from observed throughput.
+        # With only a time limit, fit the schedule once from observed throughput.
+        time_limit = budget.time_limit
         needs_calibration = (
-            self.cooling_rate == "auto"
-            and budget.max_evals is None
-            and budget.time_limit is not None
+            self.cooling_rate == "auto" and budget.max_evals is None and time_limit is not None
         )
 
         if warm_start is not None:
@@ -146,7 +126,6 @@ class SimulatedAnnealing(Strategy):
             g = int(rng.integers(n_groups))
             old_s = int(assignment[g])
 
-            # Uniform over the splits other than the current one.
             new_s = int(rng.integers(k - 1))
             if new_s >= old_s:
                 new_s += 1
@@ -157,8 +136,8 @@ class SimulatedAnnealing(Strategy):
             new_cost = total(counts)
 
             delta = new_cost - cost
-            # rng.random() is only drawn for uphill moves; short-circuiting here is
-            # load-bearing for reproducibility, not just speed.
+            # rng.random() is drawn only for uphill moves; the short-circuit is
+            # load-bearing for reproducibility.
             if delta < 0 or rng.random() < math.exp(-delta / max(temp, 1e-300)):
                 assignment[g] = new_s
                 cost = new_cost
@@ -182,11 +161,9 @@ class SimulatedAnnealing(Strategy):
 
             if n_evals % _TIME_CHECK_INTERVAL == 0:
                 now = time.perf_counter()
-                if needs_calibration:
+                if needs_calibration and time_limit is not None:
                     rate = n_evals / max(now - t_start, 1e-9)
-                    cooling_rate = self._resolve_cooling_rate(
-                        max(1, int(rate * budget.time_limit))
-                    )
+                    cooling_rate = self._resolve_cooling_rate(max(1, int(rate * time_limit)))
                     needs_calibration = False
                 if now >= deadline:
                     break

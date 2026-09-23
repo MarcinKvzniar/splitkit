@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -12,19 +12,13 @@ from ..problem import Budget, SplitProblem
 
 __all__ = ["DEFAULT_MAX_EVALS", "Outcome", "Strategy", "resolve_max_evals"]
 
-#: Evaluation budget assumed when the caller gives no stop condition at all.
 DEFAULT_MAX_EVALS = 300_000
 
-#: Stand-in for "unbounded" when wall-clock time is the real constraint.
 _EFFECTIVELY_UNBOUNDED = 1 << 62
 
 
 def resolve_max_evals(budget: Budget) -> int:
-    """The evaluation ceiling a strategy should loop against.
-
-    When only a time limit is given the evaluation count must not cap the run,
-    or a fast machine would stop early with budget left on the clock.
-    """
+    """Evaluation ceiling to loop against; unbounded when only a time limit is set."""
     if budget.max_evals is not None:
         return budget.max_evals
     if budget.time_limit is not None:
@@ -34,23 +28,9 @@ def resolve_max_evals(budget: Budget) -> int:
 
 @dataclass
 class Outcome:
-    """What a strategy returns.
+    """What a strategy returns; wrapped into ``SplitResult`` by :func:`splitkit.split`."""
 
-    Internal: :func:`splitkit.split` wraps this into the public ``SplitResult``,
-    recomputing the count matrix from ``assignment`` so that no incrementally
-    maintained state can drift into the reported numbers.
-
-    assignment    : (G,) split index per group
-    cost          : objective value (lower is better)
-    n_evals       : objective evaluations consumed
-    n_iterations  : algorithmic iterations
-    converged     : stopped because the target cost was reached
-    cost_history  : (n_evals, best_cost) snapshots
-    lower_bound   : proven bound on the optimum, when the strategy can supply one
-    proved_optimal: the returned assignment is provably optimal
-    """
-
-    assignment:     np.ndarray
+    assignment:     np.ndarray               # (G,) split index per group
     cost:           float
     n_evals:        int = 0
     n_iterations:   int = 0
@@ -61,20 +41,11 @@ class Outcome:
 
 
 class Strategy(ABC):
-    """Base class for splitting strategies.
+    """Base class for splitting strategies; instances hold only hyper-parameters."""
 
-    Subclasses hold only their own hyper-parameters. Everything about the data,
-    the objective and the stop conditions arrives through :meth:`run`, which keeps
-    strategies stateless and reusable across problems.
-    """
-
-    #: Registry key, e.g. ``"annealing"``.
     name: ClassVar[str] = ""
-    #: Same input always yields the same output; seeds are irrelevant.
     deterministic: ClassVar[bool] = False
-    #: Honours the ``warm_start`` argument to :meth:`run`.
     supports_warm_start: ClassVar[bool] = False
-    #: Optional distribution extras required, e.g. ``("ortools",)``.
     requires: ClassVar[tuple[str, ...]] = ()
 
     @abstractmethod
@@ -87,12 +58,10 @@ class Strategy(ABC):
     ) -> Outcome:
         """Search for a low-cost assignment within ``budget``."""
 
-    def params(self) -> dict:
-        """Hyper-parameters, for reporting and reproducibility."""
-        return {
-            k: v for k, v in vars(self).items() if not k.startswith("_")
-        }
+    def params(self) -> dict[str, Any]:
+        """Public hyper-parameters, for reporting and reproducibility."""
+        return {k: v for k, v in vars(self).items() if not k.startswith("_")}
 
-    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+    def __repr__(self) -> str:  # pragma: no cover
         args = ", ".join(f"{k}={v!r}" for k, v in self.params().items())
         return f"{type(self).__name__}({args})"

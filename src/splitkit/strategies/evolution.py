@@ -13,18 +13,9 @@ from .registry import register_strategy
 
 @register_strategy
 class DifferentialEvolution(Strategy):
-    """Population search on a continuous relaxation of a discrete problem.
+    """Differential evolution on a ``(G, K)`` latent whose row-wise argmax is the assignment.
 
-    Each individual is a ``(G, K)`` real matrix whose row-wise argmax gives the
-    assignment. Mutation and crossover act on the continuous latent, so the usual
-    DE operators apply unchanged; discretisation happens only at evaluation time.
-
-    Because many latent perturbations leave the argmax unchanged, a trial whose
-    discretised assignment matches its parent is not re-evaluated -- it would
-    consume budget without producing information.
-
-    Memory is ``O(pop_size * n_groups * n_splits)`` floats, which grows quickly:
-    roughly 12 MB at 10k groups, but 1.2 GB at 1M. Prefer annealing at scale.
+    Memory is ``O(pop_size * n_groups * n_splits)``; prefer annealing at scale.
 
     Parameters
     ----------
@@ -90,8 +81,7 @@ class DifferentialEvolution(Strategy):
         n_groups = problem.n_groups
         pop_size = self.pop_size
 
-        # Seed the latent so each individual's argmax reproduces a ratio-sampled
-        # assignment: the chosen split gets a positive score, the rest negative.
+        # Each individual's argmax reproduces a ratio-sampled assignment.
         assignments = rng.choice(k, size=(pop_size, n_groups), p=problem.ratios)
         pop_idx = np.arange(pop_size)[:, np.newaxis]
         grp_idx = np.arange(n_groups)[np.newaxis, :]
@@ -173,10 +163,8 @@ class DifferentialEvolution(Strategy):
             if n_evals % self.history_interval < pop_size:
                 cost_history.append((n_evals, best_cost))
 
-            # A generation in which no trial changed any assignment means the
-            # population has collapsed: every latent argmax now matches its parent,
-            # so no further evaluation can ever be spent and the budget would never
-            # be consumed. Stop instead of spinning forever.
+            # No trial changed its assignment: the population has collapsed and no
+            # evaluation can ever be spent again, so stop instead of looping forever.
             if n_evals == evals_at_generation_start:
                 converged_population = True
                 break

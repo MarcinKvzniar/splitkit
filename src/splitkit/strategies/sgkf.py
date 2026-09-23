@@ -10,37 +10,26 @@ from .registry import register_strategy
 
 __all__ = ["SGKFBaseline", "largest_remainder"]
 
-#: Cap on the synthetic item table handed to scikit-learn.
 _MAX_MATERIALIZED_ITEMS = 300_000
 
 
 def largest_remainder(ratios: np.ndarray, total: int) -> list[int]:
-    """Apportion ``total`` indivisible units across ``ratios``.
-
-    Rounds down, then hands the remaining units to the largest fractional parts.
-    Unlike repeatedly nudging the single largest ratio, this cannot starve a split
-    of its share, and it stays correct for any number of splits.
-    """
+    """Apportion ``total`` indivisible units across ``ratios`` (largest remainder)."""
     exact = ratios * total
     base = np.floor(exact).astype(int)
     remainder = total - int(base.sum())
     if remainder > 0:
         order = np.argsort(-(exact - base))
         base[order[:remainder]] += 1
-    return base.tolist()
+    return [int(b) for b in base]
 
 
 @register_strategy
 class SGKFBaseline(Strategy):
-    """Wraps scikit-learn's ``StratifiedGroupKFold`` as a comparison baseline.
+    """scikit-learn's ``StratifiedGroupKFold``, binned into the requested ratios.
 
-    scikit-learn produces equally sized folds, so this over-splits into up to 20
-    folds and then bins them to approximate the requested ratios.
-
-    Kept for benchmark comparability only. It is slow (it must materialise a
-    synthetic per-item table to call scikit-learn at all) and, above the item cap,
-    it downscales the counts -- which quietly changes the problem being solved.
-    A count-matrix-native reimplementation supersedes it.
+    A benchmark baseline: it materialises a per-item table (downscaled above
+    300k items), so it is slow and approximate.
     """
 
     name = "sgkf"
@@ -59,7 +48,7 @@ class SGKFBaseline(Strategy):
     ) -> Outcome:
         try:
             from sklearn.model_selection import StratifiedGroupKFold
-        except ImportError as exc:  # pragma: no cover - exercised via extras
+        except ImportError as exc:  # pragma: no cover
             raise ImportError(
                 "The SGKF baseline requires scikit-learn. "
                 "Install it with: pip install 'splitkit[sklearn]'"
@@ -88,8 +77,7 @@ class SGKFBaseline(Strategy):
 
         class_counts = np.bincount(y_arr)
         min_class_count = int(class_counts[class_counts > 0].min())
-        # Never ask for more folds than there are groups to fill them; K <= n_groups
-        # is already guaranteed by SplitProblem, so the result stays >= K.
+        # Capped by group count too; SplitProblem guarantees K <= n_groups.
         n_folds = min(self.max_folds, data.n_groups, max(k, min_class_count))
 
         seed = int(rng.integers(np.iinfo(np.int32).max))

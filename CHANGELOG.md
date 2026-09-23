@@ -105,6 +105,7 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   installed. They now build datasets through the public builders, which removed
   their hand-rolled aggregation loops (ISIC looped per row) and the hardcoded
   CelebA ±1 conversion. All three reproduce the committed fixtures byte for byte.
+- The package passes `mypy --strict`, and docstrings were trimmed to the essentials.
 
 ### Removed
 

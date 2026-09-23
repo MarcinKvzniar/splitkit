@@ -1,11 +1,8 @@
-"""Name-to-strategy registry.
-
-Keeps strategy lookup in one place so that ``strategy="annealing"`` works from the
-public API, the CLI and the benchmarks alike, and so third-party strategies can
-register themselves.
-"""
+"""Name-to-strategy registry, open to third-party strategies."""
 
 from __future__ import annotations
+
+from typing import Any
 
 from .base import Strategy
 
@@ -15,10 +12,7 @@ _REGISTRY: dict[str, type[Strategy]] = {}
 
 
 def register_strategy(cls: type[Strategy]) -> type[Strategy]:
-    """Register a strategy class under its ``name`` attribute.
-
-    Returns the class, so it can be used as a decorator.
-    """
+    """Class decorator registering a strategy under its ``name``."""
     if not getattr(cls, "name", ""):
         raise ValueError(f"{cls.__name__} must define a non-empty `name`.")
     _REGISTRY[cls.name] = cls
@@ -30,16 +24,9 @@ def list_strategies() -> tuple[str, ...]:
     return tuple(sorted(_REGISTRY))
 
 
-def get_strategy(strategy: str | Strategy, /, **params) -> Strategy:
-    """Resolve a name into a strategy instance.
-
-    An already-constructed :class:`Strategy` passes through unchanged, so callers
-    can accept either a convenient name or a fully configured object.
-
-    The selector is positional-only because strategies may legitimately take a
-    parameter of their own called ``strategy`` -- differential evolution's variant
-    string, for instance -- which would otherwise collide here.
-    """
+def get_strategy(strategy: str | Strategy, /, **params: Any) -> Strategy:
+    """Resolve a name into a strategy instance; instances pass through unchanged."""
+    # Positional-only: evolution has its own ``strategy`` parameter.
     if isinstance(strategy, Strategy):
         return strategy
     try:

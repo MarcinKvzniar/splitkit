@@ -1,9 +1,4 @@
-"""splitkit — group-aware stratified dataset splitting.
-
-Assign indivisible groups (patients, slides, identities, protein families) wholly to
-train/val/test so that no group leaks across splits *and* each split mirrors the
-global class distribution.
-"""
+"""splitkit: group-aware stratified dataset splitting without leakage."""
 
 from __future__ import annotations
 

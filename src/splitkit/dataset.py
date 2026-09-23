@@ -1,4 +1,4 @@
-"""The grouped-dataset container shared by every strategy."""
+"""The grouped-dataset container every strategy operates on."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 if TYPE_CHECKING:  # pragma: no cover
     import pandas as pd
@@ -18,7 +19,7 @@ __all__ = ["GroupedDataset"]
 def _require_pandas() -> Any:
     try:
         import pandas as pd
-    except ImportError as exc:  # pragma: no cover - exercised via extras
+    except ImportError as exc:  # pragma: no cover
         raise ImportError(
             "Building a dataset from a DataFrame requires pandas. "
             "Install it with: pip install 'splitkit[pandas]'"
@@ -27,12 +28,7 @@ def _require_pandas() -> Any:
 
 
 def _factorize(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Map values to contiguous integer codes plus the sorted distinct values.
-
-    Sorting keeps group and class ordering deterministic, which matters because it
-    fixes the meaning of every row and column index downstream -- and therefore
-    whether two datasets built from the same data compare equal.
-    """
+    """Contiguous integer codes plus the sorted distinct values (deterministic order)."""
     uniques, codes = np.unique(values, return_inverse=True)
     return codes.ravel(), uniques
 
@@ -49,18 +45,14 @@ def _aggregate(codes: np.ndarray, values: np.ndarray, n_groups: int) -> np.ndarr
 def _onehot_aggregate(
     codes: np.ndarray, label_codes: np.ndarray, n_groups: int, n_classes: int
 ) -> np.ndarray:
-    """Count (group, class) co-occurrences without materialising a one-hot matrix."""
+    """Count (group, class) co-occurrences without a one-hot matrix."""
     flat = codes * n_classes + label_codes
     counts = np.bincount(flat, minlength=n_groups * n_classes)
     return counts.reshape(n_groups, n_classes).astype(np.float64)
 
 
 def _decode_binary(values: np.ndarray) -> np.ndarray:
-    """Map a +/-1 indicator encoding onto 0/1, leaving other encodings alone.
-
-    CelebA-style attribute tables use -1 for absent; summing those directly would
-    cancel presence against absence instead of counting it.
-    """
+    """Map a +/-1 indicator encoding onto 0/1, leaving other encodings alone."""
     finite = values[np.isfinite(values)]
     if finite.size and np.isin(finite, (-1, 1)).all() and (finite == -1).any():
         return (values + 1) / 2
@@ -71,12 +63,8 @@ def _decode_binary(values: np.ndarray) -> np.ndarray:
 class GroupedDataset:
     """A dataset summarised as per-group class counts.
 
-    This is the only representation the optimizers ever see, which is what makes
-    splitkit domain-agnostic: image tiles per slide, images per patient, sequences
-    per protein family and rows per customer all reduce to the same count matrix.
-
-    group_vectors[i, c] = total count of class c across all items in group i
-    group_sizes[i]      = number of items in group i
+    ``group_vectors[i, c]`` is the count of class ``c`` in group ``i``;
+    ``group_sizes[i]`` is the number of items in group ``i``.
     """
 
     group_ids:     np.ndarray            # (G,) unicode
@@ -84,9 +72,7 @@ class GroupedDataset:
     group_sizes:   np.ndarray            # (G,) float64
     class_names:   tuple[str, ...]
     name:          str = "dataset"
-
-    # Item-level provenance. Present only when the dataset was built from item-level
-    # input; without it a split can name groups but cannot produce item indices.
+    # (N,) group index per item; only set when built from item-level input.
     item_group_index: np.ndarray | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
@@ -109,7 +95,6 @@ class GroupedDataset:
         if np.any(self.group_vectors < 0):
             raise ValueError("group_vectors must be non-negative.")
 
-    # Shape
     @property
     def n_groups(self) -> int:
         return int(self.group_vectors.shape[0])
@@ -122,10 +107,9 @@ class GroupedDataset:
     def total_items(self) -> int:
         return int(self.group_sizes.sum())
 
-    # Class statistics
     @cached_property
     def global_class_counts(self) -> np.ndarray:
-        return self.group_vectors.sum(axis=0)
+        return np.asarray(self.group_vectors.sum(axis=0))
 
     @property
     def global_class_frequencies(self) -> np.ndarray:
@@ -135,26 +119,17 @@ class GroupedDataset:
 
     @cached_property
     def class_group_counts(self) -> np.ndarray:
-        """(C,) number of groups in which each class occurs at all.
-
-        A class occurring in fewer than K groups cannot be spread across K splits,
-        so this drives the unstratifiable-class mask.
-        """
-        return (self.group_vectors > 0).sum(axis=0)
+        """(C,) number of groups containing each class."""
+        return np.asarray((self.group_vectors > 0).sum(axis=0))
 
     @cached_property
     def is_onehot(self) -> bool:
-        """True when every item contributes exactly one unit of class mass.
-
-        For such data, matching class counts implies matching item counts. For
-        multi-label or soft/pixel counts it does not, and the split objective needs
-        an explicit item-count term to avoid silently unbalanced splits.
-        """
+        """True when every item carries exactly one unit of class mass."""
         return bool(np.allclose(self.group_vectors.sum(axis=1), self.group_sizes))
 
     @property
     def n_items(self) -> int:
-        """Number of item-level rows, when the dataset carries item provenance."""
+        """Number of items; exact row count when item provenance is tracked."""
         if self.item_group_index is None:
             return self.total_items
         return int(self.item_group_index.size)
@@ -165,12 +140,7 @@ class GroupedDataset:
         return self.item_group_index is not None
 
     def subset(self, mask: np.ndarray) -> GroupedDataset:
-        """Restrict to a boolean or integer selection of groups.
-
-        Item provenance is dropped: the retained items would need renumbering
-        against the new group indices, and silently returning stale indices would
-        be worse than not offering them.
-        """
+        """Restrict to a selection of groups; item provenance is dropped."""
         mask = np.asarray(mask)
         return replace(
             self,
@@ -180,22 +150,17 @@ class GroupedDataset:
             item_group_index=None,
         )
 
-    # Builders
     @classmethod
     def from_counts(
         cls,
-        group_vectors,
+        group_vectors: ArrayLike,
         *,
         group_ids: Sequence[str] | None = None,
         class_names: Sequence[str] | None = None,
-        group_sizes=None,
+        group_sizes: ArrayLike | None = None,
         name: str = "dataset",
     ) -> GroupedDataset:
-        """Build directly from a ``(n_groups, n_classes)`` count matrix.
-
-        The lowest-level entry point, for data already aggregated per group.
-        Without item-level input the result cannot produce item indices.
-        """
+        """Build from an aggregated ``(n_groups, n_classes)`` count matrix."""
         vectors = np.ascontiguousarray(group_vectors, dtype=np.float64)
         if vectors.ndim != 2:
             raise ValueError(
@@ -226,8 +191,8 @@ class GroupedDataset:
     @classmethod
     def from_arrays(
         cls,
-        groups,
-        y,
+        groups: ArrayLike,
+        y: ArrayLike,
         *,
         classes: Sequence[str] | None = None,
         name: str = "dataset",
@@ -238,17 +203,13 @@ class GroupedDataset:
         Parameters
         ----------
         groups
-            ``(N,)`` group key per item -- patient id, slide id, sequence cluster.
-            Items sharing a key are never separated by a split.
+            ``(N,)`` group key per item; items sharing a key are never separated.
         y
-            ``(N,)`` class label per item, or ``(N, C)`` per-item class counts /
-            multi-label indicators.
+            ``(N,)`` class labels, or ``(N, C)`` per-item counts or indicators.
         classes
-            Column names when ``y`` is 2-D; ignored for 1-D labels, whose classes
-            are the sorted distinct values.
+            Column names when ``y`` is 2-D.
         track_items
-            Record which group each item belongs to, so a split can return item
-            indices. Costs 4 bytes per item.
+            Keep per-item group indices so a split can return item indices.
         """
         groups = np.asarray(groups)
         y = np.asarray(y)
@@ -304,7 +265,7 @@ class GroupedDataset:
         )
 
     @classmethod
-    def from_labels(cls, y, groups, **kwargs) -> GroupedDataset:
+    def from_labels(cls, y: ArrayLike, groups: ArrayLike, **kwargs: Any) -> GroupedDataset:
         """``from_arrays`` with scikit-learn's ``(y, groups)`` argument order."""
         return cls.from_arrays(groups, y, **kwargs)
 
@@ -321,20 +282,17 @@ class GroupedDataset:
         name: str = "dataset",
         track_items: bool = True,
     ) -> GroupedDataset:
-        """Build from a pandas DataFrame.
+        """Build from a pandas DataFrame, with exactly one label mode.
 
-        Exactly one label mode must be given, covering the three shapes real
-        datasets arrive in:
-
-        ``label_col``
-            One categorical column: each row is an item of a single class.
-        ``label_cols``
-            Several indicator columns: each row is an item carrying multiple
-            labels. A +/-1 encoding is detected and mapped to 0/1.
-        ``count_cols``
-            The row *is* a count vector already -- pixel counts per class, soft
-            labels, histogram bins. Pass ``size_col`` when a row stands for more
-            than one item.
+        Parameters
+        ----------
+        label_col
+            One categorical column; each row is an item of one class.
+        label_cols
+            Indicator columns for multi-label items (+/-1 is mapped to 0/1).
+        count_cols
+            Columns that already hold per-class counts; ``size_col`` gives the
+            number of items a row stands for.
         """
         pd = _require_pandas()
         if not isinstance(df, pd.DataFrame):
@@ -376,7 +334,7 @@ class GroupedDataset:
                 track_items=track_items,
             )
 
-        cols = list(label_cols if label_cols is not None else count_cols)
+        cols = list(label_cols or count_cols or ())
         values = df[cols].to_numpy(dtype=np.float64)
         if label_cols is not None:
             values = _decode_binary(values)

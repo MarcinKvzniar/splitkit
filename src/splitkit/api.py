@@ -1,4 +1,4 @@
-"""The functional entry points: :func:`split` and :func:`evaluate`."""
+"""Public entry points: :func:`split` and :func:`evaluate`."""
 
 from __future__ import annotations
 
@@ -10,15 +10,12 @@ import numpy as np
 
 from .dataset import GroupedDataset
 from .objectives import Objective
-from .problem import Budget, SplitProblem, default_names
+from .problem import Budget, SplitProblem
 from .result import SplitResult
 from .strategies import get_strategy
-from .strategies.base import Strategy
+from .strategies.base import DEFAULT_MAX_EVALS, Strategy
 
 __all__ = ["evaluate", "split"]
-
-#: Used when neither an evaluation budget nor a time budget is given.
-_DEFAULT_MAX_EVALS = 300_000
 
 
 def _coerce_ratios(
@@ -46,7 +43,7 @@ def _as_dataset(
     y: Any,
     name: str | None,
 ) -> GroupedDataset:
-    """Build a dataset from whatever the caller passed."""
+    """Build a dataset from whichever input form the caller used."""
     if isinstance(data, GroupedDataset):
         return data
 
@@ -98,38 +95,23 @@ def split(
     y: Any = None,
     **strategy_params: Any,
 ) -> SplitResult:
-    """Split grouped data into train/validation/test (or any K parts).
-
-    Groups are indivisible: every item sharing a group key lands in the same
-    split, which is what prevents leakage between related samples. Subject to
-    that, the split is chosen to match the global class distribution.
+    """Split grouped data into K parts without group leakage, matching class balance.
 
     Parameters
     ----------
     data
-        A :class:`GroupedDataset`, or a DataFrame (with ``group_col`` and one of
-        ``label_col`` / ``label_cols`` / ``count_cols``), or anything at all when
-        passing ``groups=`` and ``y=`` directly.
+        A :class:`GroupedDataset`, a DataFrame with ``group_col`` and one of
+        ``label_col``/``label_cols``/``count_cols``, or ``None`` with ``groups=``/``y=``.
     ratios
-        Either a mapping of split name to share (``{"train": 0.8, "test": 0.2}``)
-        or a bare sequence (``(0.8, 0.2)``). Rescaled to sum to 1, so ``(8, 2)``
-        and ``(0.8, 0.2)`` mean the same thing.
+        ``{"train": 0.8, "test": 0.2}`` or ``(0.8, 0.2)``; rescaled to sum to 1.
     strategy
-        Name from the registry, or a configured :class:`Strategy` instance.
-    size_weight
-        Weight on an item-count term. ``"auto"`` enables it only when the data is
-        not one-hot, where matching class counts does *not* imply matching item
-        counts.
+        Registered strategy name or a configured :class:`Strategy`.
     max_evals, time_budget
-        Stop conditions. Given neither, a default evaluation budget applies.
+        Stop conditions; a default evaluation budget applies if neither is given.
     seed
-        Seeds the strategy's random generator, making the result reproducible.
+        Makes the result reproducible.
 
-    Returns
-    -------
-    SplitResult
-        Use ``.indices`` for item positions, ``.groups`` for group ids, and
-        ``.summary()`` for a quality report.
+    See :meth:`SplitProblem.build` for the objective options.
 
     Examples
     --------
@@ -162,7 +144,7 @@ def split(
     )
 
     if max_evals is None and time_budget is None:
-        max_evals = _DEFAULT_MAX_EVALS
+        max_evals = DEFAULT_MAX_EVALS
     budget = Budget(
         max_evals=max_evals, time_limit=time_budget, target_cost=target_cost
     )
@@ -174,8 +156,7 @@ def split(
     outcome = engine.run(problem, budget, rng, warm_start=warm_start)
     elapsed = time.perf_counter() - t0
 
-    # Recompute from the returned assignment: a search maintains its counts
-    # incrementally, and a drifted accumulator must never reach the caller.
+    # Recompute from the assignment so no drifted search accumulator is reported.
     assignment = np.asarray(outcome.assignment)
     actual = problem.count_matrix(assignment)
 
@@ -214,11 +195,7 @@ def evaluate(
     weight_normalize: bool = False,
     weight_clip: float | None = None,
 ) -> float:
-    """Score an existing assignment on the same objective :func:`split` minimises.
-
-    Use it to compare a split produced elsewhere -- a manual one, or another
-    library's -- against splitkit's, on equal terms.
-    """
+    """Score an externally produced assignment on the objective :func:`split` minimises."""
     ratio_values, split_names = _coerce_ratios(ratios, names)
     problem = SplitProblem.build(
         data,
@@ -242,7 +219,3 @@ def evaluate(
             f"[0, {problem.n_splits - 1}]."
         )
     return problem.evaluate(assignment)
-
-
-# Re-exported for callers that want the default names without building a problem.
-__all__ += ["default_names"]

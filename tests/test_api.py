@@ -347,7 +347,7 @@ class TestTopLevelNamespace:
 class TestDefaultBudget:
     def test_applies_when_no_stop_condition_given(self, tiny):
         """With neither max_evals nor time_budget, a default budget applies."""
-        from splitkit.api import _DEFAULT_MAX_EVALS
+        from splitkit.strategies.base import DEFAULT_MAX_EVALS
 
         r = split(tiny, (0.5, 0.25, 0.25), seed=0)
-        assert r.n_evals == _DEFAULT_MAX_EVALS
+        assert r.n_evals == DEFAULT_MAX_EVALS

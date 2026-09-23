@@ -24,11 +24,7 @@ def default_names(k: int) -> tuple[str, ...]:
 
 
 def normalize_ratios(ratios: Sequence[float]) -> np.ndarray:
-    """Validate and rescale split ratios to sum to 1.
-
-    ``(7, 1.5, 1.5)`` and ``(0.7, 0.15, 0.15)`` express the same intent, so ratios
-    are normalised rather than rejected for not summing to one.
-    """
+    """Validate ratios and rescale them to sum to 1."""
     arr = np.asarray(ratios, dtype=np.float64)
     if arr.ndim != 1 or arr.size == 0:
         raise ValueError("ratios must be a non-empty 1-D sequence.")
@@ -36,15 +32,12 @@ def normalize_ratios(ratios: Sequence[float]) -> np.ndarray:
         raise ValueError(f"ratios must all be finite, got {list(ratios)}.")
     if np.any(arr <= 0):
         raise ValueError(f"ratios must all be positive, got {list(ratios)}.")
-    return arr / arr.sum()
+    return np.asarray(arr / arr.sum())
 
 
 @dataclass(frozen=True)
 class Budget:
-    """Stop conditions shared by every strategy.
-
-    A strategy must respect whichever of these are set; ``None`` means unbounded.
-    """
+    """Stop conditions shared by every strategy; ``None`` means unbounded."""
 
     max_evals: int | None = None
     time_limit: float | None = None
@@ -73,15 +66,10 @@ class Budget:
 
 @dataclass(frozen=True)
 class SplitProblem:
-    """A fully specified grouped-splitting problem.
+    """Everything constant across an optimisation run, so strategies stay stateless.
 
-    Holds everything constant across an optimisation run — the count matrix, the
-    class weights, the ideal target counts and the prepared objective — so that
-    strategies stay stateless and directly comparable.
-
-    ``vectors`` may carry one extra trailing pseudo-class column tracking item
-    counts (see ``size_weight``), which is why it is used in preference to
-    ``data.group_vectors`` everywhere in the search.
+    ``vectors`` may carry a trailing item-count column (see ``size_weight``), so the
+    search uses it rather than ``data.group_vectors``.
     """
 
     data:            GroupedDataset
@@ -95,7 +83,6 @@ class SplitProblem:
     dropped_classes: tuple[str, ...] = ()
     has_size_column: bool = False
 
-    # Shape
     @property
     def n_splits(self) -> int:
         return len(self.names)
@@ -109,7 +96,6 @@ class SplitProblem:
         """Number of objective columns, including the size pseudo-class if present."""
         return int(self.vectors.shape[1])
 
-    # Evaluation
     def count_matrix(self, assignment: np.ndarray) -> np.ndarray:
         """(K, C') item counts per split for ``assignment``."""
         k, g = self.n_splits, self.n_groups
@@ -123,7 +109,7 @@ class SplitProblem:
         # BLAS-backed scatter; faster than masking once the problem is large.
         onehot = np.zeros((k, g), dtype=np.float64)
         onehot[assignment, np.arange(g)] = 1.0
-        return onehot @ self.vectors
+        return np.asarray(onehot @ self.vectors)
 
     def evaluate(self, assignment: np.ndarray) -> float:
         """Objective value for a group->split assignment. Lower is better."""
@@ -137,7 +123,6 @@ class SplitProblem:
         """Draw an assignment with each group placed according to ``ratios``."""
         return rng.choice(self.n_splits, size=self.n_groups, p=self.ratios)
 
-    # Construction
     @classmethod
     def build(
         cls,
@@ -153,30 +138,22 @@ class SplitProblem:
         weight_clip: float | None = None,
         min_groups_per_class: int | None = None,
     ) -> SplitProblem:
-        """Assemble a problem from a dataset and a target ratio vector.
+        """Assemble a problem from a dataset and target ratios.
 
         Parameters
         ----------
-        ratios
-            Target fraction per split; rescaled to sum to 1.
-        names
-            Split names; defaults to train/val/test conventions for K in (2, 3).
         class_weights
-            ``"inverse_frequency"`` (rare classes penalised harder),
-            ``"uniform"``, or an explicit ``(C,)`` array.
+            ``"inverse_frequency"``, ``"uniform"`` or an explicit ``(C,)`` array.
         size_weight
-            Weight of an extra item-count column. ``"auto"`` enables it (weight 1)
-            only when the data is not one-hot, where matching class counts does
-            *not* imply matching item counts. ``0`` disables it.
+            Weight of an extra item-count column. ``"auto"`` enables it only for
+            non-one-hot data, where matching class counts does not match item counts.
         unstratifiable
-            ``"drop"`` zero-weights classes present in fewer than K groups (they
-            cannot be spread across K splits); ``"keep"`` scores them anyway.
+            ``"drop"`` zero-weights classes present in fewer than K groups;
+            ``"keep"`` scores them anyway.
         weight_normalize
-            Rescale weights to mean 1 over the retained classes, making costs
-            comparable across datasets.
+            Rescale weights to mean 1, making costs comparable across datasets.
         weight_clip
-            Optional upper percentile (0-100) at which to clip weights, stopping a
-            single ultra-rare class from dominating the objective.
+            Upper percentile (0-100) at which to clip weights.
         """
         ratio_arr = normalize_ratios(ratios)
         k = int(ratio_arr.size)
@@ -195,7 +172,6 @@ class SplitProblem:
 
         obj = get_objective(objective)
 
-        # --- class weights -------------------------------------------------
         counts = data.global_class_counts.astype(np.float64)
         if isinstance(class_weights, str):
             if class_weights == "inverse_frequency":
@@ -224,7 +200,6 @@ class SplitProblem:
                 )
             weights = np.minimum(weights, np.percentile(weights, weight_clip))
 
-        # --- unstratifiable classes ----------------------------------------
         threshold = k if min_groups_per_class is None else min_groups_per_class
         keep = data.class_group_counts >= threshold
         if unstratifiable == "drop":
@@ -249,7 +224,6 @@ class SplitProblem:
         if weight_normalize:
             weights = weights / weights[retained].mean()
 
-        # --- optional item-count pseudo-class -------------------------------
         vectors = data.group_vectors
         if size_weight == "auto":
             size_weight = 0.0 if data.is_onehot else 1.0

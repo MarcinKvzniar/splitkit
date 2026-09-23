@@ -10,18 +10,12 @@ from ..problem import Budget, SplitProblem
 from .base import Outcome, Strategy, resolve_max_evals
 from .registry import register_strategy
 
-#: How often to consult the wall clock, in evaluations.
 _TIME_CHECK_INTERVAL = 1024
 
 
 @register_strategy
 class RandomSearch(Strategy):
-    """Independent uniform sampling under the target ratios.
-
-    A control, not a contender: it establishes how hard the search space is, and
-    every directed strategy should beat it by a wide margin. Useful in benchmarks
-    and as a sanity floor in tests.
-    """
+    """Independent sampling under the target ratios; a baseline, not a contender."""
 
     name = "random"
 
