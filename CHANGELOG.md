@@ -54,6 +54,12 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   to stderr so the output pipes cleanly:
   `splitkit data.csv --group-col patient --label-col diagnosis -o split.csv`.
   Requires the `pandas` extra.
+- **Plots** (`splitkit.viz`, `pip install 'splitkit[viz]'`).
+  `plot_distribution()` draws, for every class, the fraction of its items in
+  each split against the target ratios, so rare classes are as visible as common
+  ones. `plot_convergence()` draws best cost against evaluations, with the
+  proven lower bound when the exact strategy supplies one. Both accept and
+  return a matplotlib `Axes`.
 - Strategy registry: `get_strategy()`, `list_strategies()`, `register_strategy()`.
 - Warm-start support (`Strategy.run(..., warm_start=...)`).
 - Arbitrary **K splits**. Split counts are no longer hardcoded to three; ratios

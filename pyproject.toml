@@ -85,7 +85,6 @@ markers = [
 
 [tool.coverage.run]
 source = ["splitkit"]
-omit = ["*/viz.py"]
 
 [tool.ruff]
 line-length = 100
