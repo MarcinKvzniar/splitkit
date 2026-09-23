@@ -49,6 +49,11 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   benchmark datasets (for example 1.01 vs 1.81 on `synth_few_groups`, and
   proven optimal on `synth_concentrated` in 0.2 s). Practical up to a few
   thousand groups; beyond that it warns and falls back to annealing.
+- **`splitkit` command line** (also `python -m splitkit`). Reads a CSV or TSV
+  (or stdin) and writes it back with a split column, printing the quality report
+  to stderr so the output pipes cleanly:
+  `splitkit data.csv --group-col patient --label-col diagnosis -o split.csv`.
+  Requires the `pandas` extra.
 - Strategy registry: `get_strategy()`, `list_strategies()`, `register_strategy()`.
 - Warm-start support (`Strategy.run(..., warm_start=...)`).
 - Arbitrary **K splits**. Split counts are no longer hardcoded to three; ratios

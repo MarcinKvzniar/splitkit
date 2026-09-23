@@ -38,6 +38,9 @@ viz     = ["matplotlib>=3.6"]
 exact   = ["scipy>=1.10"]
 all     = ["splitkit[pandas,sklearn,viz,exact]"]
 
+[project.scripts]
+splitkit = "splitkit.cli:main"
+
 [project.urls]
 Homepage      = "https://github.com/MarcinKvzniar/splitkit"
 Repository    = "https://github.com/MarcinKvzniar/splitkit"
@@ -82,7 +85,7 @@ markers = [
 
 [tool.coverage.run]
 source = ["splitkit"]
-omit = ["*/viz.py", "*/cli.py"]
+omit = ["*/viz.py"]
 
 [tool.ruff]
 line-length = 100
