@@ -12,6 +12,7 @@ from .base import Outcome, Strategy, resolve_max_evals
 from .registry import register_strategy
 
 _TIME_CHECK_INTERVAL = 4096
+_DRAW_BATCH = 4096  # per-call numpy overhead dominates single draws
 
 
 @register_strategy
@@ -120,15 +121,16 @@ class SimulatedAnnealing(Strategy):
         iteration = 0
 
         while n_evals < max_evals:
+            j = iteration % _DRAW_BATCH
+            if j == 0:
+                groups = rng.integers(n_groups, size=_DRAW_BATCH).tolist()
+                shifts = rng.integers(1, k, size=_DRAW_BATCH).tolist()
             iteration += 1
             n_evals += 1
 
-            g = int(rng.integers(n_groups))
+            g = groups[j]
             old_s = int(assignment[g])
-
-            new_s = int(rng.integers(k - 1))
-            if new_s >= old_s:
-                new_s += 1
+            new_s = (old_s + shifts[j]) % k
 
             vec = vectors[g]
             counts[old_s] -= vec

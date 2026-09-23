@@ -1,15 +1,4 @@
-"""The incremental-update invariant.
-
-Annealing maintains the count matrix incrementally: a move subtracts a group's
-vector from one split and adds it to another, rather than recomputing from
-scratch. Every bug in that scheme -- a missed undo on a rejected move, a stale
-row, accumulated float drift over hundreds of thousands of updates -- shows up as
-a divergence between the incrementally maintained cost and a fresh recomputation.
-
-These tests pin that invariant down. They are what make it safe to replace the
-full recomputation with true O(C) row deltas: the optimisation is only valid if it
-agrees with the definition.
-"""
+"""Incrementally maintained counts and costs must agree with a fresh recomputation."""
 
 from __future__ import annotations
 
@@ -77,8 +66,7 @@ class TestIncrementalCounts:
 
 class TestDeltaCost:
     def test_two_row_delta_matches_total(self, problem):
-        """Only two splits change on a move, so the cost delta needs only those
-        two rows. This is the identity Phase 7's fast path depends on."""
+        """A move changes only two splits, so their rows alone give the cost delta."""
         rng = np.random.default_rng(2)
         assignment = problem.random_assignment(rng)
         counts = problem.count_matrix(assignment)

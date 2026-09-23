@@ -127,6 +127,12 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   installed. They now build datasets through the public builders, which removed
   their hand-rolled aggregation loops (ISIC looped per row) and the hardcoded
   CelebA ±1 conversion. All three reproduce the committed fixtures byte for byte.
+- Simulated annealing draws its random moves in blocks rather than one at a time,
+  raising throughput by 36% (162k to 221k evaluations/s on `synth_large_complex`).
+  Search quality is statistically unchanged, but trajectories for a given seed
+  differ from earlier versions. Scoring a move from its two changed rows was
+  measured as well and rejected: with numpy's per-call overhead it is slower than
+  a full recomputation until K x C reaches the thousands.
 - The package passes `mypy --strict`, and docstrings were trimmed to the essentials.
 
 ### Removed
@@ -164,7 +170,6 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   incontestable ground truth for optimality claims.
 - The incremental-update invariant is pinned down explicitly: incremental counts,
   rejected-move undo, and two-row cost deltas are each checked against a fresh
-  recomputation. This is the precondition for replacing the full cost
-  recomputation with true O(C) deltas.
+  recomputation.
 - Builder tests assert the no-leakage guarantee end to end: every item of a group
   lands in one split, and the returned item indices partition the dataset exactly.
