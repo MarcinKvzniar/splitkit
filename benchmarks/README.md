@@ -16,9 +16,6 @@ budget and a 70/15/15 target. SGKF and the exact solver are deterministic and ru
 once; the exact solver gets 20 seconds. Reports and convergence plots go to
 `results/`.
 
-`tune_sa.py` and `tune_de.py` are the grid searches that selected the annealing
-and differential evolution settings.
-
 ## Results
 
 Mean cost ± standard deviation (lower is better). Exact and SGKF run once.
