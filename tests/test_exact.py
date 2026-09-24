@@ -54,6 +54,20 @@ class TestOptimality:
         assert out.cost == pytest.approx(optimal, rel=1e-9)
         assert np.bincount(out.assignment, minlength=3).min() >= 1
 
+    def test_many_duplicates_are_merged_without_losing_optimality(self, monkeypatch):
+        data = make_dataset([[3, 1]] * 6 + [[1, 2]] * 4 + [[0, 4], [2, 2]])
+        problem = SplitProblem.build(data, (0.5, 0.5))
+        _, optimal = brute_force(problem)
+        seen = []
+        import scipy.optimize
+
+        milp = scipy.optimize.milp
+        monkeypatch.setattr("scipy.optimize.milp", lambda **kw: seen.append(kw) or milp(**kw))
+        out = solve(problem)
+        assert len(seen[0]["c"]) == 4 * 2 + 2 * 3  # 4 types x 2 splits, plus error terms
+        assert out.proved_optimal
+        assert out.cost == pytest.approx(optimal, rel=1e-9)
+
     def test_expand_hands_out_each_types_groups(self):
         type_of = np.array([0, 1, 0, 0, 1])
         assignment = _expand(np.array([[2, 1], [0, 2]]), type_of)

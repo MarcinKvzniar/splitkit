@@ -119,7 +119,7 @@ evaluations each. Exact gets 20 seconds.
 
 | dataset | groups | annealing | exact | evolution | `StratifiedGroupKFold` |
 |---|---|---|---|---|---|
-| CelebA | 10,177 | 0.231 | 0.235\* | **0.154** | 1.278 |
+| CelebA | 10,177 | 0.215 | 0.215\* | **0.154** | 1.278 |
 | ISIC 2020 | 2,056 | 0.589 | **0.583** | **0.583** | 11.286 |
 | BCSS | 151 | 7.49 | **7.20** | 7.48 | 44.27 |
 | synth_large_complex | 763 | 0.420 | **0.410** | 0.575 | 10.34 |
@@ -127,11 +127,13 @@ evaluations each. Exact gets 20 seconds.
 | synth_few_groups | 96 | 1.61 | **1.01** | 2.27 | 17.61 |
 | typical time | | 1.3 s | 20 s | 12–200 s | < 5 s |
 
-\* No solution within 20 s, so it fell back to annealing.
+\* More than 10,000 distinct groups, so the exact strategy hands over to annealing.
 
-scikit-learn's `StratifiedGroupKFold` is 5–70 times worse than annealing on every
-dataset. The exact solver is best wherever it can run, and differential evolution
-wins on the largest dataset if you can spend minutes rather than seconds.
+scikit-learn's `StratifiedGroupKFold` is 3–25 times worse than annealing on every
+dataset here. It comes close only on data made of many small single-label groups,
+such as patients with one or two visits each. The exact solver is best wherever it
+can run, and differential evolution wins on the largest dataset if you can spend
+minutes rather than seconds.
 
 Details, datasets and how to reproduce them are in
 [`benchmarks/`](https://github.com/MarcinKvzniar/splitkit/tree/main/benchmarks).

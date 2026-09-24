@@ -23,8 +23,8 @@ class ExactMILP(Strategy):
     Uses ``Budget.time_limit`` (or ``default_time_limit`` when unset) and ignores
     evaluation counts. On timeout it returns the best solution found and the bound;
     if none was found it warns and runs annealing on the evaluation budget instead.
-    Groups with identical class vectors are merged into types, so what limits it is
-    the number of distinct types, not groups.
+    When merging groups with identical class vectors at least halves the model, it
+    solves over those types instead, so the limit is the number of distinct types.
 
     Parameters
     ----------
@@ -80,10 +80,15 @@ class ExactMILP(Strategy):
             )
 
         # Groups with identical vectors are interchangeable: solve for how many of
-        # each type go to each split. This removes the symmetry that stalls HiGHS.
+        # each type go to each split. This removes the symmetry that stalls HiGHS,
+        # but with few duplicates the per-group model searches better within a limit.
         types, type_of, sizes = np.unique(
             problem.vectors, axis=0, return_inverse=True, return_counts=True
         )
+        n_groups = problem.n_groups
+        if len(types) > n_groups // 2 and n_groups <= self.max_types:
+            types, type_of = problem.vectors, np.arange(n_groups)
+            sizes = np.ones(n_groups, dtype=np.intp)
         if len(types) > self.max_types:
             return _fallback(
                 problem, budget, rng,

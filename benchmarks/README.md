@@ -22,18 +22,19 @@ Mean cost ± standard deviation (lower is better). Exact and SGKF run once.
 
 | dataset | annealing | exact (20 s) | evolution | SGKF | random |
 |---|---|---|---|---|---|
-| CelebA | 0.231 ± 0.018 | 0.235\* | **0.154 ± 0.011** | 1.278 | 2.098 ± 0.107 |
+| CelebA | 0.215 ± 0.024 | 0.215\* | **0.154 ± 0.011** | 1.278 | 2.098 ± 0.107 |
 | ISIC 2020 | 0.589 ± 0.001 | **0.583** | **0.583 ± 0.000** | 11.286 | 0.659 ± 0.019 |
 | BCSS | 7.49 ± 0.17 | **7.20** | 7.48 ± 0.04 | 44.27 | 10.74 ± 0.32 |
 | synth_large_complex | 0.420 ± 0.027 | **0.410** | 0.575 ± 0.044 | 10.34 | 12.42 ± 0.39 |
 | synth_easy_balanced | 0.040 ± 0.006 | **0.008** | 0.011 ± 0.002 | 0.120 | 0.097 ± 0.011 |
-| synth_mild_imbalance | **0.128 ± 0.018** | 0.143 | 0.146 ± 0.019 | 0.692 | 1.785 ± 0.140 |
+| synth_mild_imbalance | **0.122 ± 0.017** | 0.143 | 0.146 ± 0.019 | 0.692 | 1.785 ± 0.140 |
 | synth_heavy_imbalance | 2.34 ± 0.11 | **1.91** | 2.52 ± 0.07 | 28.24 | 11.67 ± 0.58 |
 | synth_few_groups | 1.61 ± 0.19 | **1.01** | 2.27 ± 0.19 | 17.61 | 9.79 ± 0.69 |
 | synth_concentrated | 7.76 ± 0.09 | **7.64** (proven optimal, 0.2 s) | 7.74 ± 0.07 | 29.97 | 15.09 ± 0.55 |
-| mean time | 1.3 s | 0.2–37 s | 12–204 s | 0.05–4.7 s | 7–159 s |
+| mean time | 1.3 s | 0.2–20 s | 12–204 s | 0.05–4.7 s | 7–159 s |
 
-\* The solver found no solution within 20 s on CelebA and fell back to annealing.
+\* CelebA has more than 10,000 distinct groups, so the exact strategy hands over to
+annealing.
 
 Costs are comparable within a row, not across datasets.
 
