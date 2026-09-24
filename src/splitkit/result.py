@@ -213,8 +213,10 @@ class SplitResult:
             for gid in self.dataset.group_ids[self.assignment == s]:
                 mapping[gid] = name
 
+        # Stringify keys exactly as the dataset builders did, so dates etc. match.
+        keys = np.asarray(df[group_col].to_numpy()).astype(np.str_)
         target = df if inplace else df.copy()
-        target[column] = df[group_col].astype(str).map(mapping)
+        target[column] = [mapping.get(k) for k in keys]
         return target
 
     def summary(self) -> str:

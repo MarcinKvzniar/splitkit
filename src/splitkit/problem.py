@@ -26,8 +26,8 @@ def default_names(k: int) -> tuple[str, ...]:
 def normalize_ratios(ratios: Sequence[float]) -> np.ndarray:
     """Validate ratios and rescale them to sum to 1."""
     arr = np.asarray(ratios, dtype=np.float64)
-    if arr.ndim != 1 or arr.size == 0:
-        raise ValueError("ratios must be a non-empty 1-D sequence.")
+    if arr.ndim != 1 or arr.size < 2:
+        raise ValueError(f"ratios must be a 1-D sequence of at least 2 splits, got {ratios!r}.")
     if not np.all(np.isfinite(arr)):
         raise ValueError(f"ratios must all be finite, got {list(ratios)}.")
     if np.any(arr <= 0):

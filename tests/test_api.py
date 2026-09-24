@@ -243,6 +243,16 @@ class TestDataFrameHelpers:
         # every row of a patient carries the same label
         assert (out.groupby("patient_id")["split"].nunique() == 1).all()
 
+    def test_assign_column_with_date_keys(self):
+        df = pd.DataFrame(
+            {
+                "visit": pd.to_datetime(np.repeat(np.arange(12), 3), unit="D"),
+                "y": ["a", "b", "b"] * 12,
+            }
+        )
+        res = split(df, group_col="visit", label_col="y", max_evals=500, seed=0)
+        assert res.assign_column(df, "visit")["split"].notna().all()
+
     def test_assign_column_inplace(self, clinical_df, result):
         copy = clinical_df.copy()
         result.assign_column(copy, "patient_id", column="fold", inplace=True)

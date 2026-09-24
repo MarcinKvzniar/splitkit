@@ -93,6 +93,16 @@ class TestSplitting:
         frame.to_csv(tsv, sep="\t", index=False)
         assert run(capsys, str(tsv), "--group-col", "patient", "--label-col", "diagnosis", *FAST)[0] == 0
 
+    def test_preserves_input_values(self, capsys, tmp_path):
+        path = tmp_path / "ids.csv"
+        path.write_text("g,y,v\n007,a,1.50\n7,b,NA\n8,a,\n9,b,2\n10,a,3\n")
+        code, out, _ = run(capsys, str(path), "--group-col", "g", "--label-col", "y", *FAST)
+        raw = pd.read_csv(io.StringIO(out), dtype=str, keep_default_na=False)
+        assert code == 0
+        assert raw["g"].tolist() == ["007", "7", "8", "9", "10"]
+        assert raw["v"].tolist() == ["1.50", "NA", "", "2", "3"]
+        assert raw["split"].ne("").all()
+
 
 class TestErrors:
     def test_missing_column_is_reported_cleanly(self, capsys, csv):
@@ -100,6 +110,22 @@ class TestErrors:
         assert code == 1
         assert err.startswith("splitkit: error:")
         assert "nope" in err
+
+    def test_refuses_to_overwrite_existing_column(self, capsys, tmp_path, frame):
+        path = tmp_path / "data.csv"
+        frame.assign(split="old").to_csv(path, index=False)
+        code, _, err = run(capsys, str(path), "--group-col", "patient", "--label-col", "diagnosis")
+        assert code == 1
+        assert "already exists" in err
+
+    def test_unwritable_output_is_reported_cleanly(self, capsys, csv, tmp_path):
+        target = tmp_path / "missing_dir" / "out.csv"
+        code, _, err = run(
+            capsys, csv, "--group-col", "patient", "--label-col", "diagnosis",
+            "-o", str(target), *FAST,
+        )
+        assert code == 1
+        assert "splitkit: error:" in err
 
     def test_missing_file_is_reported_cleanly(self, capsys, tmp_path):
         code, _, err = run(capsys, str(tmp_path / "absent.csv"), "--group-col", "g", "--label-col", "y")

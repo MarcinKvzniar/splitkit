@@ -29,8 +29,30 @@ def _require_pandas() -> Any:
 
 def _factorize(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Contiguous integer codes plus the sorted distinct values (deterministic order)."""
-    uniques, codes = np.unique(values, return_inverse=True)
+    try:
+        uniques, codes = np.unique(values, return_inverse=True)
+    except TypeError:  # unorderable mixed types, e.g. ints and strings
+        keys = np.array([f"{type(v).__name__}:{v}" for v in values])
+        _, first, codes = np.unique(keys, return_index=True, return_inverse=True)
+        uniques = values[first]
     return codes.ravel(), uniques
+
+
+def _is_missing(value: object) -> bool:
+    """None, NaN, or pandas NA (whose comparisons are not booleans)."""
+    try:
+        return value is None or bool(value != value)
+    except TypeError:
+        return True
+
+
+def _has_missing(values: np.ndarray) -> bool:
+    """True if a 1-D array holds NaN, None or pandas NA."""
+    if values.dtype.kind == "f":
+        return bool(np.isnan(values).any())
+    if values.dtype.kind == "O":
+        return any(_is_missing(v) for v in values)
+    return False
 
 
 def _aggregate(codes: np.ndarray, values: np.ndarray, n_groups: int) -> np.ndarray:
@@ -222,14 +244,16 @@ class GroupedDataset:
             )
         if len(groups) == 0:
             raise ValueError("Cannot build a dataset from zero items.")
+        if _has_missing(groups):
+            raise ValueError("groups contains missing values; every item needs a group.")
 
         codes, group_ids = _factorize(groups)
         n_groups = len(group_ids)
         sizes = np.bincount(codes, minlength=n_groups).astype(np.float64)
 
         if y.ndim == 1:
-            if y.dtype.kind == "f" and np.isnan(y).any():
-                raise ValueError("y contains NaN; every item needs a label.")
+            if _has_missing(y):
+                raise ValueError("y contains NaN or None; every item needs a label.")
             label_codes, label_values = _factorize(y)
             vectors = _onehot_aggregate(
                 codes, label_codes, n_groups, len(label_values)
@@ -298,6 +322,10 @@ class GroupedDataset:
         if not isinstance(df, pd.DataFrame):
             raise TypeError(f"Expected a pandas DataFrame, got {type(df).__name__}.")
 
+        if isinstance(label_cols, str):
+            label_cols = [label_cols]
+        if isinstance(count_cols, str):
+            count_cols = [count_cols]
         chosen = [
             n
             for n, v in (
@@ -319,7 +347,10 @@ class GroupedDataset:
             if c is not None and c not in df.columns
         ]
         if missing:
-            raise KeyError(f"Column(s) not found in the DataFrame: {missing}.")
+            raise KeyError(
+                f"Column(s) not found in the DataFrame: {missing}. "
+                f"Available: {list(df.columns)}."
+            )
 
         if df.empty:
             raise ValueError("Cannot build a dataset from an empty DataFrame.")
@@ -336,6 +367,8 @@ class GroupedDataset:
 
         cols = list(label_cols or count_cols or ())
         values = df[cols].to_numpy(dtype=np.float64)
+        if np.isnan(values).any():
+            raise ValueError(f"Columns {cols} contain missing values.")
         if label_cols is not None:
             values = _decode_binary(values)
 

@@ -29,7 +29,8 @@ class TestNormalizeRatios:
             ((0.7, 0.0, 0.3), "positive"),
             ((0.7, float("nan"), 0.3), "finite"),
             ((0.7, float("inf")), "finite"),
-            ((), "non-empty"),
+            ((), "at least 2"),
+            ((1.0,), "at least 2"),
         ],
     )
     def test_rejects_invalid(self, bad, match):

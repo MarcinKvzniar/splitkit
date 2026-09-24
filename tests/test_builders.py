@@ -101,6 +101,26 @@ class TestFromArrays:
         with pytest.raises(ValueError, match="NaN"):
             GroupedDataset.from_arrays(np.array([1, 2]), np.array([1.0, np.nan]))
 
+    def test_rejects_missing_text_labels(self):
+        y = np.array(["a", None, float("nan")], dtype=object)
+        with pytest.raises(ValueError, match="NaN or None"):
+            GroupedDataset.from_arrays(np.array([1, 2, 3]), y)
+
+    def test_mixed_type_labels_and_groups(self):
+        ds = GroupedDataset.from_arrays(
+            np.array([1, "a", 1, "a"], dtype=object),
+            np.array([0, "x", "x", 0], dtype=object),
+        )
+        assert ds.n_groups == 2
+        assert ds.n_classes == 2
+
+    @pytest.mark.parametrize(
+        "groups", [np.array([1.0, np.nan]), np.array(["a", None], dtype=object)]
+    )
+    def test_rejects_missing_groups(self, groups):
+        with pytest.raises(ValueError, match="missing values"):
+            GroupedDataset.from_arrays(groups, np.array([0, 1]))
+
     def test_rejects_nan_in_2d(self):
         with pytest.raises(ValueError, match="NaN"):
             GroupedDataset.from_arrays(
@@ -271,6 +291,23 @@ class TestFromDataFrame:
         df = pd.DataFrame({"g": ["a", None], "y": ["x", "x"]})
         with pytest.raises(ValueError, match="missing group keys"):
             GroupedDataset.from_dataframe(df, group_col="g", label_col="y")
+
+    def test_missing_pandas_na_labels_rejected(self, clinical):
+        clinical["dx"] = pd.array(["mel", None] * 3, dtype="string")
+        with pytest.raises(ValueError, match="NaN or None"):
+            GroupedDataset.from_dataframe(clinical, group_col="patient", label_col="dx")
+
+    def test_missing_counts_rejected(self):
+        df = pd.DataFrame({"g": ["a", "b"], "x": [1.0, np.nan]})
+        with pytest.raises(ValueError, match="missing values"):
+            GroupedDataset.from_dataframe(df, group_col="g", count_cols=["x"])
+
+    def test_single_column_name_as_string(self):
+        df = pd.DataFrame({"g": ["a", "b"], "tumor": [1, 0]})
+        d = GroupedDataset.from_dataframe(df, group_col="g", label_cols="tumor")
+        assert d.class_names == ("tumor",)
+        d = GroupedDataset.from_dataframe(df, group_col="g", count_cols="tumor")
+        assert d.class_names == ("tumor",)
 
     def test_rejects_non_dataframe(self):
         with pytest.raises(TypeError, match="DataFrame"):

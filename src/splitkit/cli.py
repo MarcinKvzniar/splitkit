@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -33,7 +34,7 @@ def _parser() -> argparse.ArgumentParser:
         "Writes the input with an added split column; the quality report goes to stderr.",
     )
     parser.add_argument("input", nargs="?", help="CSV file (tab-separated if .tsv), or '-' for stdin")
-    parser.add_argument("-o", "--output", default="-", help="output CSV (default: stdout)")
+    parser.add_argument("-o", "--output", default="-", help="output file, same format as the input (default: stdout)")
     parser.add_argument("--column", default="split", help="name of the added column")
 
     columns = parser.add_argument_group("columns")
@@ -70,8 +71,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         pd = _require_pandas()
-        source = sys.stdin if args.input == "-" else args.input
-        df = pd.read_csv(source, sep="\t" if args.input.endswith(".tsv") else ",")
+        text = sys.stdin.read() if args.input == "-" else Path(args.input).read_text("utf-8-sig")
+        sep = "\t" if args.input.endswith(".tsv") else ","
+        # Keys and labels stay text, so IDs like "007" and "7" remain distinct.
+        as_text = {c: str for c in (args.group_col, args.label_col) if c}
+        df = pd.read_csv(io.StringIO(text), sep=sep, dtype=as_text)
+        if args.column in df.columns:
+            raise ValueError(
+                f"column {args.column!r} already exists; choose another with --column"
+            )
         result = split(
             df,
             args.ratios,
@@ -86,12 +94,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             count_cols=args.count_cols,
             name=Path(args.input).stem if args.input != "-" else "stdin",
         )
+        print(result.summary(), file=sys.stderr)
+
+        # Write the input back verbatim (no re-typed values) plus the split column.
+        out = pd.read_csv(io.StringIO(text), sep=sep, dtype=str, keep_default_na=False)
+        out[args.column] = result.assign_column(df, args.group_col)["split"].to_numpy()
+        out.to_csv(sys.stdout if args.output == "-" else args.output, sep=sep, index=False)
     except (ImportError, OSError, KeyError, ValueError) as exc:
         message = exc.args[0] if isinstance(exc, KeyError) else exc
         print(f"splitkit: error: {message}", file=sys.stderr)
         return 1
-
-    print(result.summary(), file=sys.stderr)
-    labelled = result.assign_column(df, args.group_col, column=args.column)
-    labelled.to_csv(sys.stdout if args.output == "-" else args.output, index=False)
     return 0
