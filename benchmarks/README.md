@@ -60,6 +60,16 @@ to run the benchmark.
 
 The synthetic sets come from `splitkit.from_preset(name)`.
 
+### Origin
+
+The three real datasets are publicly available. The committed files contain only
+per-group class counts derived from them, with no images or metadata. Download the
+originals from their sources, which also give their terms of use:
+
+- **BCSS:** [github.com/PathologyDataScience/BCSS](https://github.com/PathologyDataScience/BCSS)
+- **CelebA:** [mmlab.ie.cuhk.edu.hk/projects/CelebA.html](https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
+- **ISIC 2020:** [challenge2020.isic-archive.com](https://challenge2020.isic-archive.com/)
+
 To rebuild the real fixtures from the original downloads:
 
 ```bash
