@@ -6,8 +6,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-The project was a university coursework repository (metaheuristic optimization of
-group-aware stratified splitting) and is being rebuilt as an installable package.
+## [0.1.0] - 2026-09-24
+
+First release. splitkit grew out of a research prototype for metaheuristic
+group-aware stratified splitting; the *Changed*, *Removed* and *Fixed* sections
+below are relative to that prototype.
 
 ### Added
 
@@ -203,3 +206,6 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   recomputation.
 - Builder tests assert the no-leakage guarantee end to end: every item of a group
   lands in one split, and the returned item indices partition the dataset exactly.
+
+[Unreleased]: https://github.com/MarcinKvzniar/splitkit/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/MarcinKvzniar/splitkit/releases/tag/v0.1.0
