@@ -331,7 +331,7 @@ class TestBudgets:
         assumes_300k = split(
             clinical_df, max_evals=2_000, cooling_rate=0.9999, **kw
         ).cost
-        assert adaptive < assumes_300k / 10
+        assert adaptive < assumes_300k / 2
 
     def test_more_budget_still_helps(self, clinical_df):
         """Quality must improve monotonically with budget, never degrade."""

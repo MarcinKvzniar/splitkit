@@ -13,6 +13,7 @@ import pytest
 
 from _brute import brute_force
 from _helpers import make_dataset
+from splitkit import GroupedDataset
 from splitkit.problem import Budget, SplitProblem
 from splitkit.strategies import Strategy, get_strategy, list_strategies
 from splitkit.strategies.registry import _REGISTRY
@@ -167,6 +168,25 @@ class TestSearchQuality:
             problem, Budget(max_evals=6000), np.random.default_rng(0)
         )
         assert long.cost <= short.cost
+
+    def test_many_tiny_groups_on_a_tight_budget(self):
+        """Patient-style data: every move is tiny and each group gets ~5 moves.
+
+        A fixed starting temperature once scrambled such splits beyond repair.
+        """
+        rng = np.random.default_rng(0)
+        data = GroupedDataset.from_arrays(np.arange(20_000), rng.choice(3, 20_000, p=[0.54, 0.35, 0.11]))
+        problem = SplitProblem.build(data)
+        out = get_strategy("annealing").run(problem, Budget(max_evals=100_000), rng)
+        assert out.cost < 0.01
+
+    @pytest.mark.parametrize(
+        ("largest", "max_evals", "expected"),
+        [(10.0, 10_000, 1.0), (0.5, 10_000, 0.5), (0.5, 9_999, 0.125)],
+    )
+    def test_starting_temperature(self, largest, max_evals, expected):
+        """Capped by the configured start and the largest move, cooler on a tight budget."""
+        assert get_strategy("annealing")._starting_temp(largest, max_evals, 100) == expected
 
     @pytest.mark.parametrize("name", ["annealing", "evolution"])
     def test_finds_optimum_on_tiny_instance(self, name):

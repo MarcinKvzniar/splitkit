@@ -13,6 +13,11 @@ from .registry import register_strategy
 
 _TIME_CHECK_INTERVAL = 4096
 _DRAW_BATCH = 4096  # per-call numpy overhead dominates single draws
+_PROBE_MOVES = 2048
+# Under this many moves per group there is no time to repair a scrambled split,
+# so the search starts 4x colder than the largest move.
+_TIGHT_MOVES_PER_GROUP = 100
+_TIGHT_COOLING = 4.0
 
 
 @register_strategy
@@ -24,11 +29,14 @@ class SimulatedAnnealing(Strategy):
     Parameters
     ----------
     initial_temp
-        Starting temperature, on the order of a typical cost delta.
+        Upper bound on the starting temperature. The run never starts hotter than
+        the largest cost change of a single move, and 4x colder than that when the
+        budget allows under 100 moves per group.
     cooling_rate
         Per-step multiplier in (0, 1), or ``"auto"`` to fit the schedule to the budget.
     min_temp
-        Reheat trigger; must be below ``initial_temp``.
+        Reheat trigger, scaled with the starting temperature; must be below
+        ``initial_temp``.
     anneal_cycles
         Number of full cool-downs ``"auto"`` fits into the budget.
     """
@@ -76,6 +84,11 @@ class SimulatedAnnealing(Strategy):
         steps = max(1.0, max_evals / self.anneal_cycles)
         return float(math.exp(math.log(self.min_temp / self.initial_temp) / steps))
 
+    def _starting_temp(self, largest_move: float, max_evals: int, n_groups: int) -> float:
+        """Never hotter than the largest move, and colder still on a tight budget."""
+        tight = max_evals < _TIGHT_MOVES_PER_GROUP * n_groups
+        return min(self.initial_temp, largest_move / (_TIGHT_COOLING if tight else 1.0))
+
     def run(
         self,
         problem: SplitProblem,
@@ -94,9 +107,7 @@ class SimulatedAnnealing(Strategy):
         cooling_rate = self._resolve_cooling_rate(max_evals)
         # With only a time limit, fit the schedule once from observed throughput.
         time_limit = budget.time_limit
-        needs_calibration = (
-            self.cooling_rate == "auto" and budget.max_evals is None and time_limit is not None
-        )
+        needs_calibration = budget.max_evals is None and time_limit is not None
 
         if warm_start is not None:
             assignment = np.asarray(warm_start, dtype=np.intp).copy()
@@ -111,12 +122,16 @@ class SimulatedAnnealing(Strategy):
         cost = total(counts)
         n_evals = 1
 
+        largest = _largest_move(problem, assignment, counts, cost)
+        initial_temp = self._starting_temp(largest, max_evals, n_groups)
+        min_temp = self.min_temp * initial_temp / self.initial_temp
+
         best_assignment = assignment.copy()
         best_counts = counts.copy()
         best_cost = cost
 
         cost_history: list[tuple[int, float]] = [(1, best_cost)]
-        temp = self.initial_temp
+        temp = initial_temp
         n_reheats = 0
         iteration = 0
 
@@ -154,8 +169,8 @@ class SimulatedAnnealing(Strategy):
 
             temp *= cooling_rate
 
-            if temp < self.min_temp:
-                temp = self.initial_temp
+            if temp < min_temp:
+                temp = initial_temp
                 assignment = best_assignment.copy()
                 counts = best_counts.copy()
                 cost = best_cost
@@ -165,8 +180,12 @@ class SimulatedAnnealing(Strategy):
                 budget.report(n_evals, best_cost)
                 now = time.perf_counter()
                 if needs_calibration and time_limit is not None:
-                    rate = n_evals / max(now - t_start, 1e-9)
-                    cooling_rate = self._resolve_cooling_rate(max(1, int(rate * time_limit)))
+                    projected = max(1, int(n_evals / max(now - t_start, 1e-9) * time_limit))
+                    cooling_rate = self._resolve_cooling_rate(projected)
+                    rescale = self._starting_temp(largest, projected, n_groups) / initial_temp
+                    initial_temp, min_temp, temp = (
+                        initial_temp * rescale, min_temp * rescale, temp * rescale
+                    )
                     needs_calibration = False
                 if now >= deadline:
                     break
@@ -179,3 +198,18 @@ class SimulatedAnnealing(Strategy):
             converged=best_cost <= budget.target_cost,
             cost_history=cost_history,
         )
+
+
+def _largest_move(
+    problem: SplitProblem, assignment: np.ndarray, counts: np.ndarray, cost: float
+) -> float:
+    """Largest cost change over single moves of evenly spaced groups (no RNG draws)."""
+    k, total = problem.n_splits, problem.prepared.total
+    largest = 0.0
+    for g in np.linspace(0, problem.n_groups - 1, min(problem.n_groups, _PROBE_MOVES)).astype(int):
+        old_s = int(assignment[g])
+        moved = counts.copy()
+        moved[old_s] -= problem.vectors[g]
+        moved[(old_s + 1) % k] += problem.vectors[g]
+        largest = max(largest, abs(total(moved) - cost))
+    return largest if largest > 0 else float("inf")
