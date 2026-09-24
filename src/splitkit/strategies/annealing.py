@@ -162,6 +162,7 @@ class SimulatedAnnealing(Strategy):
                 n_reheats += 1
 
             if n_evals % _TIME_CHECK_INTERVAL == 0:
+                budget.report(n_evals, best_cost)
                 now = time.perf_counter()
                 if needs_calibration and time_limit is not None:
                     rate = n_evals / max(now - t_start, 1e-9)

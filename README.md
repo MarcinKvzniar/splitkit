@@ -22,7 +22,7 @@ directly.
 ```bash
 pip install splitkit                 # numpy only
 pip install 'splitkit[pandas]'       # DataFrame input and the command line
-pip install 'splitkit[all]'          # plus exact solver (SciPy), plots, SGKF baseline
+pip install 'splitkit[all]'          # plus exact solver (SciPy), plots, rich output, SGKF baseline
 ```
 
 ## Quickstart
@@ -65,14 +65,18 @@ splitkit.split(df, {"train": 0.8, "test": 0.2}, group_col=..., label_col=...)
 adds a split column, and `splitkit.evaluate(dataset, assignment)` scores a split
 made elsewhere on the same objective.
 
+Pass `progress=True` for a live progress bar. With `pip install 'splitkit[rich]'` it is
+styled, and `rich.print(result)` prints the report as a formatted panel.
+
 ## Command line
 
 ```bash
 splitkit data.csv --group-col patient_id --label-col diagnosis --seed 0 -o split.csv
 ```
 
-This writes `data.csv` back with a `split` column and prints the quality report to
-stderr. Run `splitkit --help` for all options.
+This writes `data.csv` back unchanged plus a `split` column. In a terminal it shows a
+progress bar and then the quality report on stderr; `-q` silences both. Run
+`splitkit --help` for all options.
 
 ## Strategies
 

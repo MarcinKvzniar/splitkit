@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import __version__
+from ._console import print_report
 from .api import split
 from .dataset import _require_pandas
 from .strategies import list_strategies
@@ -36,6 +37,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("input", nargs="?", help="CSV file (tab-separated if .tsv), or '-' for stdin")
     parser.add_argument("-o", "--output", default="-", help="output file, same format as the input (default: stdout)")
     parser.add_argument("--column", default="split", help="name of the added column")
+    parser.add_argument("-q", "--quiet", action="store_true", help="no progress bar or report")
 
     columns = parser.add_argument_group("columns")
     columns.add_argument("--group-col", help="items sharing a value stay in one split")
@@ -93,8 +95,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             label_cols=args.label_cols,
             count_cols=args.count_cols,
             name=Path(args.input).stem if args.input != "-" else "stdin",
+            progress=not args.quiet and sys.stderr.isatty(),
         )
-        print(result.summary(), file=sys.stderr)
+        if not args.quiet:
+            print_report(result)
 
         # Write the input back verbatim (no re-typed values) plus the split column.
         out = pd.read_csv(io.StringIO(text), sep=sep, dtype=str, keep_default_na=False)

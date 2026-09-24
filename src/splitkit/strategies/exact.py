@@ -83,7 +83,12 @@ class ExactMILP(Strategy):
                 stacklevel=2,
             )
             fallback = SimulatedAnnealing().run(
-                problem, Budget(max_evals=budget.max_evals or DEFAULT_MAX_EVALS), rng
+                problem,
+                Budget(
+                    max_evals=budget.max_evals or DEFAULT_MAX_EVALS,
+                    on_progress=budget.on_progress,
+                ),
+                rng,
             )
             return Outcome(
                 assignment=fallback.assignment,

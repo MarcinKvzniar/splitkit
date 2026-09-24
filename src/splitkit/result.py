@@ -254,32 +254,34 @@ class SplitResult:
             f"off target by {err:.1%}"
         )
 
-        empty = self.empty_classes()
-        if empty:
-            for name, classes in empty.items():
-                shown = ", ".join(classes[:5])
-                more = f" (+{len(classes) - 5} more)" if len(classes) > 5 else ""
-                lines.append(f"WARNING  {name!r} contains no: {shown}{more}")
-
-        if self.dropped_classes:
-            shown = ", ".join(self.dropped_classes[:5])
-            more = (
-                f" (+{len(self.dropped_classes) - 5} more)"
-                if len(self.dropped_classes) > 5
-                else ""
-            )
-            lines.append(
-                f"NOTE     {len(self.dropped_classes)} class(es) excluded from the "
-                f"objective as unstratifiable: {shown}{more}"
-            )
-            lines.append(
-                "         They occur in too few groups to appear in every split."
-            )
+        tags = {"warning": "WARNING  ", "note": "NOTE     "}
+        for level, message in self._issues():
+            lines.append(tags[level] + message.replace("\n", "\n         "))
         lines.append("=" * 68)
         return "\n".join(lines)
 
     def __str__(self) -> str:  # pragma: no cover
         return self.summary()
+
+    def __rich__(self) -> Any:
+        """Styled report for ``rich.print(result)``."""
+        from ._console import render_report
+
+        return render_report(self)
+
+    def _issues(self) -> list[tuple[str, str]]:
+        """``(level, message)`` pairs for empty and unstratifiable classes."""
+        issues = []
+        for name, classes in self.empty_classes().items():
+            issues.append(("warning", f"{name!r} contains no: {_shorten(classes)}"))
+        if self.dropped_classes:
+            issues.append((
+                "note",
+                f"{len(self.dropped_classes)} class(es) excluded from the objective as "
+                f"unstratifiable: {_shorten(self.dropped_classes)}\n"
+                "They occur in too few groups to appear in every split.",
+            ))
+        return issues
 
     def _index(self, name: str) -> int:
         try:
@@ -306,6 +308,11 @@ class SplitResult:
                 f".groups to get group ids instead."
             )
         return np.asarray(self.assignment[index])
+
+
+def _shorten(names: tuple[str, ...], limit: int = 5) -> str:
+    more = f" (+{len(names) - limit} more)" if len(names) > limit else ""
+    return ", ".join(names[:limit]) + more
 
 
 def _require_pandas() -> Any:

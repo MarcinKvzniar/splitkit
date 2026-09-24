@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import dataclasses
 import time
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
 from typing import Any
 
 import numpy as np
 
+from ._console import progress_display
 from .dataset import GroupedDataset
 from .objectives import Objective
 from .problem import Budget, SplitProblem
@@ -85,6 +88,7 @@ def split(
     time_budget: float | None = None,
     target_cost: float = 0.0,
     seed: int | None = None,
+    progress: bool = False,
     warm_start: np.ndarray | None = None,
     name: str | None = None,
     group_col: str | None = None,
@@ -110,6 +114,8 @@ def split(
         Stop conditions; a default evaluation budget applies if neither is given.
     seed
         Makes the result reproducible.
+    progress
+        Show a live progress bar on stderr (styled if ``rich`` is installed).
 
     See :meth:`SplitProblem.build` for the objective options.
 
@@ -153,7 +159,10 @@ def split(
     rng = np.random.default_rng(seed)
 
     t0 = time.perf_counter()
-    outcome = engine.run(problem, budget, rng, warm_start=warm_start)
+    display = progress_display(engine.name, budget) if progress else nullcontext(None)
+    with display as report:
+        budget = dataclasses.replace(budget, on_progress=report)
+        outcome = engine.run(problem, budget, rng, warm_start=warm_start)
     elapsed = time.perf_counter() - t0
 
     # Recompute from the assignment so no drifted search accumulator is reported.

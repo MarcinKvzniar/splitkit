@@ -36,7 +36,8 @@ pandas  = ["pandas>=1.5"]
 sklearn = ["scikit-learn>=1.1"]
 viz     = ["matplotlib>=3.6"]
 exact   = ["scipy>=1.10"]
-all     = ["splitkit[pandas,sklearn,viz,exact]"]
+rich    = ["rich>=13"]
+all     = ["splitkit[pandas,sklearn,viz,exact,rich]"]
 
 [project.scripts]
 splitkit = "splitkit.cli:main"
@@ -55,8 +56,6 @@ dev = [
     "hypothesis>=6.100",
     "ruff>=0.15",
     "mypy>=1.10",
-    "build",
-    "twine",
 ]
 bench = ["matplotlib>=3.6", "pandas>=1.5", "pillow>=10.0", "scikit-learn>=1.1"]
 
@@ -109,5 +108,5 @@ files = ["src/splitkit"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["pandas.*", "sklearn.*", "matplotlib.*", "scipy.*"]
+module = ["pandas.*", "sklearn.*", "matplotlib.*", "scipy.*", "rich.*"]
 ignore_missing_imports = true

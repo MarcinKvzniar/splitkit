@@ -45,8 +45,10 @@ class RandomSearch(Strategy):
                 best_assignment = assignment
                 cost_history.append((n_evals, best_cost))
 
-            if n_evals % _TIME_CHECK_INTERVAL == 0 and time.perf_counter() >= deadline:
-                break
+            if n_evals % _TIME_CHECK_INTERVAL == 0:
+                budget.report(n_evals, best_cost)
+                if time.perf_counter() >= deadline:
+                    break
 
         return Outcome(
             assignment=best_assignment,

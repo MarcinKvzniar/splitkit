@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -42,6 +42,7 @@ class Budget:
     max_evals: int | None = None
     time_limit: float | None = None
     target_cost: float = 0.0
+    on_progress: Callable[[int, float], None] | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         if self.max_evals is not None and self.max_evals < 1:
@@ -56,6 +57,11 @@ class Budget:
         if self.time_limit is not None and elapsed >= self.time_limit:
             return True
         return cost <= self.target_cost
+
+    def report(self, n_evals: int, best_cost: float) -> None:
+        """Pass search progress to ``on_progress``, if set."""
+        if self.on_progress is not None:
+            self.on_progress(n_evals, best_cost)
 
     def deadline_from(self, t_start: float) -> float:
         """Absolute perf-counter time at which ``time_limit`` expires."""

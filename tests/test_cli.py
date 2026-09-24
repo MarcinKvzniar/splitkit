@@ -55,7 +55,7 @@ class TestSplitting:
         assert len(labelled) == len(frame)
         assert set(labelled["split"]) == {"train", "val", "test"}
         assert (labelled.groupby("patient")["split"].nunique() == 1).all()
-        assert "Strategy: annealing" in err
+        assert "annealing" in err
 
     def test_writes_output_file(self, capsys, csv, tmp_path):
         target = tmp_path / "out.csv"
@@ -102,6 +102,14 @@ class TestSplitting:
         assert raw["g"].tolist() == ["007", "7", "8", "9", "10"]
         assert raw["v"].tolist() == ["1.50", "NA", "", "2", "3"]
         assert raw["split"].ne("").all()
+
+    def test_quiet_suppresses_the_report(self, capsys, csv):
+        code, out, err = run(
+            capsys, csv, "--group-col", "patient", "--label-col", "diagnosis", "-q", *FAST
+        )
+        assert code == 0
+        assert err == ""
+        assert "split" in read_output(out).columns
 
 
 class TestErrors:

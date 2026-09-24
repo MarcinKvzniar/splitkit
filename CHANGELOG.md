@@ -27,6 +27,8 @@ Initial release.
   with `seed=`.
 - `splitkit` command line for CSV/TSV files (`[pandas]` extra).
 - `splitkit.viz` plots of per-class allocation and convergence (`[viz]` extra).
+- A live progress bar (`progress=True`, on by default in the command line) and a
+  styled report via `rich.print(result)` (`[rich]` extra, with a plain-text fallback).
 - `GroupedDataset` builders, pickle-free `.npz` I/O, and synthetic datasets for
   experiments.
 - numpy is the only required dependency. Python 3.10–3.14, fully typed.

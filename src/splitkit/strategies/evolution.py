@@ -158,6 +158,7 @@ class DifferentialEvolution(Strategy):
                         best_latent = trial.copy()
                         best_assignment = trial_assignment.copy()
 
+            budget.report(n_evals, best_cost)
             if n_evals % self.history_interval < pop_size:
                 cost_history.append((n_evals, best_cost))
 
