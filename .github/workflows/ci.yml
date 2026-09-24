@@ -35,6 +35,7 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - run: uv run pytest
+      - run: uv run python examples/quickstart.py
 
   test-full:
     name: test (all extras, coverage)

@@ -19,7 +19,7 @@ N_RUNS = 10
 SEEDS = [42 + i for i in range(N_RUNS)]
 
 GRID = {
-    "strategy": [
+    "variant": [
         "DE/rand/1/bin", "DE/best/1/bin", "DE/rand/1/exp", "DE/best/1/exp",
         "DE/rand/2/bin", "DE/best/2/bin", "DE/rand/2/exp", "DE/best/2/exp"
     ],
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             "representative_res": histories[closest_idx]
         })
 
-        log(f"[{i + 1:3d}/{len(combinations)}] {params['strategy']:<15} | Pop={params['pop_size']:<3} | F={params['f_weight']:<3} | CR={params['crossover_prob']:<3} -> Cost: {mean_cost:8.4f} ± {std_cost:.4f}")
+        log(f"[{i + 1:3d}/{len(combinations)}] {params['variant']:<15} | Pop={params['pop_size']:<3} | F={params['f_weight']:<3} | CR={params['crossover_prob']:<3} -> Cost: {mean_cost:8.4f} ± {std_cost:.4f}")
 
     log("-" * 90)
     log(f"Grid search completed in {time.time() - t_start_all:.1f}s")
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     results_list.sort(key=lambda x: x["mean"])
     best = results_list[0]
 
-    log(f"\nBEST PARAMS: {best['params']['strategy']}, Pop={best['params']['pop_size']}, F={best['params']['f_weight']}, CR={best['params']['crossover_prob']}")
+    log(f"\nBEST PARAMS: {best['params']['variant']}, Pop={best['params']['pop_size']}, F={best['params']['f_weight']}, CR={best['params']['crossover_prob']}")
     log(f"BEST COST:   {best['mean']:.4f} ± {best['std']:.4f}")
 
     # Create report
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         f.write("-" * 75 + "\n")
         for idx, r in enumerate(results_list, 1):
             p = r["params"]
-            f.write(f" #{idx:<3} | {p['strategy']:<15} | {p['pop_size']:<5} | {p['f_weight']:<4.1f} | {p['crossover_prob']:<4.1f} | {r['mean']:<10.4f} | ±{r['std']:<8.4f}\n")
+            f.write(f" #{idx:<3} | {p['variant']:<15} | {p['pop_size']:<5} | {p['f_weight']:<4.1f} | {p['crossover_prob']:<4.1f} | {r['mean']:<10.4f} | ±{r['std']:<8.4f}\n")
     print(f"Saved text report to {txt_path}")
 
     fig, (ax_best, ax_worst) = plt.subplots(1, 2, figsize=(16, 6))
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         res = r["representative_res"]
         evals, costs = unpack_history(res)
 
-        label = f"#{idx + 1}: {p['strategy']} (Pop={p['pop_size']}, F={p['f_weight']}, CR={p['crossover_prob']})"
+        label = f"#{idx + 1}: {p['variant']} (Pop={p['pop_size']}, F={p['f_weight']}, CR={p['crossover_prob']})"
         ax_best.step(evals, costs, label=label, color=colors[idx % len(colors)], linewidth=2.0, where='post')
 
     ax_best.set_title("Top 5 BEST Configurations", fontweight="bold", color="green")
@@ -135,7 +135,7 @@ if __name__ == "__main__":
         evals, costs = unpack_history(res)
 
         original_rank = len(results_list) - idx
-        label = f"#{original_rank}: {p['strategy']} (Pop={p['pop_size']}, F={p['f_weight']}, CR={p['crossover_prob']})"
+        label = f"#{original_rank}: {p['variant']} (Pop={p['pop_size']}, F={p['f_weight']}, CR={p['crossover_prob']})"
         ax_worst.step(evals, costs, label=label, color=colors[idx % len(colors)], linewidth=2.0, where='post')
 
     ax_worst.set_title("Top 5 WORST Configurations", fontweight="bold", color="red")

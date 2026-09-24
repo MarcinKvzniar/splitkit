@@ -68,7 +68,7 @@ class TestEvolutionVariants:
     @pytest.mark.parametrize("cross", ["bin", "exp"])
     def test_variant_runs_and_is_valid(self, problem, base, n_diffs, cross):
         variant = f"DE/{base}/{n_diffs}/{cross}"
-        out = get_strategy("evolution", strategy=variant, pop_size=12).run(
+        out = get_strategy("evolution", variant=variant, pop_size=12).run(
             problem, Budget(max_evals=800), np.random.default_rng(0)
         )
         assert out.assignment.max() < problem.n_splits
@@ -77,7 +77,7 @@ class TestEvolutionVariants:
     def test_benchmark_variant_is_deterministic(self, problem):
         """DE/best/2/exp with the tuned hyper-parameters, as the benchmark runs it."""
         kw = dict(
-            strategy="DE/best/2/exp", pop_size=50, f_weight=0.9, crossover_prob=0.5
+            variant="DE/best/2/exp", pop_size=50, f_weight=0.9, crossover_prob=0.5
         )
         runs = [
             get_strategy("evolution", **kw)
@@ -89,9 +89,9 @@ class TestEvolutionVariants:
 
     def test_min_pop_depends_on_variant(self):
         """DE/rand/2 needs more distinct individuals per step than DE/best/1."""
-        get_strategy("evolution", strategy="DE/best/1/bin", pop_size=3)
+        get_strategy("evolution", variant="DE/best/1/bin", pop_size=3)
         with pytest.raises(ValueError, match="at least"):
-            get_strategy("evolution", strategy="DE/rand/2/bin", pop_size=5)
+            get_strategy("evolution", variant="DE/rand/2/bin", pop_size=5)
 
     def test_population_collapse_terminates(self, problem):
         """A collapsed population must end the run, not spin forever.
@@ -100,7 +100,7 @@ class TestEvolutionVariants:
         Once the population converges no trial differs, so `n_evals` stops rising
         and a `while n_evals < max_evals` loop never exits on its own.
         """
-        out = get_strategy("evolution", strategy="DE/best/1/bin", pop_size=12).run(
+        out = get_strategy("evolution", variant="DE/best/1/bin", pop_size=12).run(
             problem, Budget(max_evals=10**7), np.random.default_rng(0)
         )
         assert out.n_evals < 10**7

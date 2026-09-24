@@ -26,7 +26,6 @@ def list_strategies() -> tuple[str, ...]:
 
 def get_strategy(strategy: str | Strategy, /, **params: Any) -> Strategy:
     """Resolve a name into a strategy instance; instances pass through unchanged."""
-    # Positional-only: evolution has its own ``strategy`` parameter.
     if isinstance(strategy, Strategy):
         return strategy
     try:

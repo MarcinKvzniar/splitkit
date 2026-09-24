@@ -45,8 +45,8 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   Solves the split with SciPy's HiGHS solver and reports a proven optimum, or the
   best solution plus a lower bound when the time limit runs out. Count constraints
   are scaled by their targets, so pixel-scale counts stay within solver
-  tolerances. With a 20 s limit it beat 300k-evaluation annealing on 7 of 8
-  benchmark datasets (for example 1.01 vs 1.81 on `synth_few_groups`, and
+  tolerances. With a 20 s limit it beat 300k-evaluation annealing on 7 of 9
+  benchmark datasets (for example 1.01 vs 1.61 on `synth_few_groups`, and
   proven optimal on `synth_concentrated` in 0.2 s). Practical up to a few
   thousand groups; beyond that it warns and falls back to annealing.
 - **`splitkit` command line** (also `python -m splitkit`). Reads a CSV or TSV
@@ -89,6 +89,14 @@ group-aware stratified splitting) and is being rebuilt as an installable package
   `(0.7, 0.15, 0.15)` express the same intent. Non-finite, zero and negative
   ratios still raise.
 - `Optimizer` (ABC) replaced by `Strategy`, returning an internal `Outcome`.
+- Differential evolution defaults to the grid-search winner, `DE/best/2/exp` with
+  `f_weight=0.9` and `crossover_prob=0.5` (was `DE/rand/1/bin`, 0.5, 0.7). With
+  it, DE is the best strategy on CelebA (0.154 vs 0.231 for annealing).
+- Differential evolution's variant parameter is now `variant` (was `strategy`),
+  which collided with `split()`'s own `strategy` argument and made DE impossible
+  to configure through `split()`.
+- `split()` no longer needs a placeholder first argument for array input:
+  `split(groups=..., y=...)`.
 - **Class weights are normalised to mean 1 by default** (`weight_normalize=True`).
   The original inverse-frequency weights were documented as mean-normalised but
   never were, so costs were incomparable across datasets and the annealing

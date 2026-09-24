@@ -19,7 +19,7 @@ class DifferentialEvolution(Strategy):
 
     Parameters
     ----------
-    strategy
+    variant
         ``DE/{rand,best}/{1,2}/{bin,exp}``.
     pop_size
         Population size; must exceed the number of individuals each step samples.
@@ -34,23 +34,21 @@ class DifferentialEvolution(Strategy):
     def __init__(
         self,
         pop_size: int = 50,
-        f_weight: float = 0.5,
-        crossover_prob: float = 0.7,
-        strategy: str = "DE/rand/1/bin",
+        f_weight: float = 0.9,
+        crossover_prob: float = 0.5,
+        variant: str = "DE/best/2/exp",
         history_interval: int = 10_000,
     ) -> None:
-        parts = strategy.split("/")
+        parts = variant.split("/")
         if len(parts) != 4 or parts[0] != "DE":
-            raise ValueError(
-                f"strategy must look like 'DE/rand/1/bin', got {strategy!r}."
-            )
+            raise ValueError(f"variant must look like 'DE/rand/1/bin', got {variant!r}.")
         _, base, n_diffs, cross = parts
         if base not in ("rand", "best"):
-            raise ValueError(f"strategy base must be 'rand' or 'best', got {base!r}.")
+            raise ValueError(f"variant base must be 'rand' or 'best', got {base!r}.")
         if cross not in ("bin", "exp"):
-            raise ValueError(f"strategy crossover must be 'bin' or 'exp', got {cross!r}.")
+            raise ValueError(f"variant crossover must be 'bin' or 'exp', got {cross!r}.")
 
-        self.strategy = strategy
+        self.variant = variant
         self.pop_size = pop_size
         self.f_weight = f_weight
         self.crossover_prob = crossover_prob
@@ -63,7 +61,7 @@ class DifferentialEvolution(Strategy):
         min_pop = (2 * self._n_diffs) + (1 if base == "rand" else 0) + 1
         if pop_size < min_pop:
             raise ValueError(
-                f"pop_size must be at least {min_pop} for {strategy}, got {pop_size}."
+                f"pop_size must be at least {min_pop} for {variant}, got {pop_size}."
             )
 
     def run(

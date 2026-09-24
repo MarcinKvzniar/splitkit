@@ -1,7 +1,7 @@
 """Benchmark runner: compare split optimizers across multiple seeds.
 Evaluates Mean +/- Std Dev of cost and plots mean convergence curves with shaded std regions.
 
-Usage: uv run python run_benchmark.py [bcss|celeba|isic|synth_*]
+Usage: uv run python -m benchmarks.run_benchmark [bcss|celeba|isic|synth_*]
 """
 
 import glob
@@ -21,6 +21,7 @@ from splitkit import Budget, GroupedDataset, SplitProblem
 from splitkit.io import load_npz
 from splitkit.strategies import (
     DifferentialEvolution,
+    ExactMILP,
     RandomSearch,
     SGKFBaseline,
     SimulatedAnnealing,
@@ -30,19 +31,25 @@ MAX_EVALS = 300_000
 RATIOS = (0.70, 0.15, 0.15)
 N_RUNS = 10
 SEEDS = [42 + i for i in range(N_RUNS)]
+EXACT_TIME_LIMIT = 20.0
 
 _OPTIMIZERS = [
     ("SA", SimulatedAnnealing, dict()),
-    ("DE", DifferentialEvolution, dict(strategy="DE/best/2/exp", pop_size=50, f_weight=0.9, crossover_prob=0.5)),
+    ("DE", DifferentialEvolution, dict()),
     ("RS", RandomSearch, dict()),
     ("SGKF", SGKFBaseline, dict()),
+    ("Exact", ExactMILP, dict()),
 ]
+
+# One-shot strategies run once and appear as horizontal reference lines.
+_ONE_SHOT_BUDGETS = {"SGKF": Budget(max_evals=1), "Exact": Budget(time_limit=EXACT_TIME_LIMIT)}
 
 _STYLE = {
     "SA": dict(color="#1f77b4", linestyle="-", linewidth=1.8),
     "DE": dict(color="#d62728", linestyle="-", linewidth=1.8),
     "RS": dict(color="#ff7f0e", linestyle="--", linewidth=1.8),
     "SGKF": dict(color="#2ca02c", linestyle=":", linewidth=2.0),
+    "Exact": dict(color="#9467bd", linestyle="-.", linewidth=2.0),
 }
 
 _DATASET_PATHS = {
@@ -70,9 +77,8 @@ def run_one(dataset_name: str) -> tuple[GroupedDataset, dict]:
         histories = []
         times = []
 
-        # SGKF is deterministic
-        runs_to_do = 1 if label == "SGKF" else N_RUNS
-        budget = Budget(max_evals=1 if label == "SGKF" else MAX_EVALS)
+        runs_to_do = 1 if label in _ONE_SHOT_BUDGETS else N_RUNS
+        budget = _ONE_SHOT_BUDGETS.get(label, Budget(max_evals=MAX_EVALS))
 
         for idx in range(runs_to_do):
             seed = SEEDS[idx]
@@ -110,8 +116,8 @@ def plot_convergence(name: str, results: dict, outdir: str):
     for label, data in results.items():
         sty = _STYLE.get(label, {})
 
-        if label == "SGKF":
-            ax.axhline(y=data["mean_cost"], label=f"SGKF (Cost: {data['mean_cost']:.4f})", **sty)
+        if label in _ONE_SHOT_BUDGETS:
+            ax.axhline(y=data["mean_cost"], label=f"{label} (Cost: {data['mean_cost']:.4f})", **sty)
         else:
             interp_costs = []
 

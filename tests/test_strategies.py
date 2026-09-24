@@ -239,10 +239,11 @@ class TestRegistry:
         with pytest.raises(KeyError, match="Unknown strategy"):
             get_strategy("does_not_exist")
 
-    def test_selector_is_positional_only(self):
-        """DE takes a parameter named `strategy`; the selector must not collide."""
-        s = get_strategy("evolution", strategy="DE/best/2/exp")
-        assert s.strategy == "DE/best/2/exp"
+    def test_variant_is_configurable_through_split(self, tiny):
+        from splitkit import split
+
+        r = split(tiny, (0.5, 0.5), strategy="evolution", variant="DE/best/2/exp", max_evals=200)
+        assert r.strategy_params["variant"] == "DE/best/2/exp"
 
     def test_params_are_reported(self):
         s = get_strategy("annealing", initial_temp=50.0)
@@ -267,9 +268,9 @@ class TestStrategyValidation:
     @pytest.mark.parametrize(
         "kwargs, match",
         [
-            ({"strategy": "nonsense"}, "DE/rand/1/bin"),
-            ({"strategy": "DE/other/1/bin"}, "base"),
-            ({"strategy": "DE/rand/1/zzz"}, "crossover"),
+            ({"variant": "nonsense"}, "DE/rand/1/bin"),
+            ({"variant": "DE/other/1/bin"}, "base"),
+            ({"variant": "DE/rand/1/zzz"}, "crossover"),
             ({"pop_size": 2}, "pop_size must be at least"),
         ],
     )

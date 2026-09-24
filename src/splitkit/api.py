@@ -70,7 +70,7 @@ def _as_dataset(
 
 
 def split(
-    data: Any,
+    data: Any = None,
     ratios: Mapping[str, float] | Sequence[float] = (0.70, 0.15, 0.15),
     *,
     names: Sequence[str] | None = None,
@@ -101,7 +101,7 @@ def split(
     ----------
     data
         A :class:`GroupedDataset`, a DataFrame with ``group_col`` and one of
-        ``label_col``/``label_cols``/``count_cols``, or ``None`` with ``groups=``/``y=``.
+        ``label_col``/``label_cols``/``count_cols``; omit it when passing ``groups=``/``y=``.
     ratios
         ``{"train": 0.8, "test": 0.2}`` or ``(0.8, 0.2)``; rescaled to sum to 1.
     strategy

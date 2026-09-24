@@ -47,7 +47,7 @@ class TestInputForms:
         rng = np.random.default_rng(0)
         groups = rng.integers(0, 30, size=200)
         y = rng.integers(0, 3, size=200)
-        r = split(None, groups=groups, y=y, max_evals=1000, seed=0)
+        r = split(groups=groups, y=y, max_evals=1000, seed=0)
         assert r.dataset.n_groups == len(np.unique(groups))
 
     def test_from_grouped_dataset(self, tiny):
@@ -56,7 +56,7 @@ class TestInputForms:
 
     def test_requires_both_groups_and_y(self):
         with pytest.raises(ValueError, match="both"):
-            split(None, groups=np.array([1, 2]), max_evals=10)
+            split(groups=np.array([1, 2]), max_evals=10)
 
     def test_unusable_input_explains_options(self):
         with pytest.raises(TypeError, match="Cannot build a dataset"):
