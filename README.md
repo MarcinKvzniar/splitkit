@@ -14,7 +14,7 @@ directly.
 - Any ratios and any number of splits: `{"train": 0.7, "val": 0.15, "test": 0.15}`.
 - Single-label, multi-label, and count data (such as pixel counts per class).
 - A quality report on every split, and a proven optimum for problems up to a few
-  thousand groups.
+  thousand distinct groups.
 - Only numpy is required.
 
 ## Install
@@ -83,7 +83,7 @@ progress bar and then the quality report on stderr; `-q` silences both. Run
 | strategy | when to use it |
 |---|---|
 | `annealing` (default) | Any size. Simulated annealing whose schedule adapts to the budget. |
-| `exact` | Up to a few thousand groups, with `pip install 'splitkit[exact]'`. Mixed-integer programming via HiGHS: a proven optimum, or the best split found plus a lower bound when time runs out. |
+| `exact` | Up to a few thousand *distinct* groups, with `pip install 'splitkit[exact]'`. Mixed-integer programming via HiGHS: a proven optimum, or the best split found plus a lower bound when time runs out. Identical groups are merged, so 70k single-visit patients may be only a few hundred types. Above 10,000 types it warns and uses annealing. |
 | `evolution` | Very large datasets, when minutes are acceptable. Differential evolution; it was best on CelebA's 10k groups. |
 | `random`, `sgkf` | Baselines: random search and scikit-learn's `StratifiedGroupKFold`. |
 

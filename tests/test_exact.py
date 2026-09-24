@@ -12,6 +12,7 @@ from _helpers import make_dataset
 from splitkit import split
 from splitkit.problem import Budget, SplitProblem
 from splitkit.strategies import Outcome, get_strategy
+from splitkit.strategies.exact import _expand
 
 pytest.importorskip("scipy")
 pytestmark = pytest.mark.exact
@@ -44,6 +45,21 @@ class TestOptimality:
         _, optimal = brute_force(problem)
         assert solve(problem).cost == pytest.approx(optimal, rel=1e-9)
 
+    def test_identical_groups_are_merged_without_losing_optimality(self):
+        data = make_dataset([[3, 1], [3, 1], [3, 1], [1, 2], [1, 2], [0, 4], [2, 2], [2, 2]])
+        problem = SplitProblem.build(data, (0.5, 0.25, 0.25))
+        _, optimal = brute_force(problem)
+        out = solve(problem)
+        assert out.proved_optimal
+        assert out.cost == pytest.approx(optimal, rel=1e-9)
+        assert np.bincount(out.assignment, minlength=3).min() >= 1
+
+    def test_expand_hands_out_each_types_groups(self):
+        type_of = np.array([0, 1, 0, 0, 1])
+        assignment = _expand(np.array([[2, 1], [0, 2]]), type_of)
+        np.testing.assert_array_equal(np.bincount(assignment[type_of == 0], minlength=2), [2, 1])
+        np.testing.assert_array_equal(assignment[type_of == 1], [1, 1])
+
     def test_summary_reports_the_proof(self, tiny):
         assert "PROVEN OPTIMAL" in split(tiny, (0.5, 0.5), strategy="exact").summary()
 
@@ -60,11 +76,22 @@ class TestLimits:
     def test_falls_back_to_annealing_without_a_solution(self, tiny_problem, monkeypatch):
         no_solution = SimpleNamespace(x=None, status=1, mip_dual_bound=float("nan"))
         monkeypatch.setattr("scipy.optimize.milp", lambda **_: no_solution)
-        with pytest.warns(RuntimeWarning, match="falling back"):
+        with pytest.warns(RuntimeWarning, match="no solution found"):
             out = solve(tiny_problem, max_evals=500)
         assert out.lower_bound is None
         assert not out.proved_optimal
         assert out.cost == pytest.approx(tiny_problem.evaluate(out.assignment), rel=1e-9)
+
+    def test_too_many_types_skips_the_solver(self, tiny_problem, monkeypatch):
+        def never_called(**_):
+            raise AssertionError("the MILP should not be built")
+
+        monkeypatch.setattr("scipy.optimize.milp", never_called)
+        engine = get_strategy("exact", max_types=2)
+        with pytest.warns(RuntimeWarning, match="max_types=2"):
+            out = engine.run(tiny_problem, Budget(max_evals=500), np.random.default_rng(0))
+        assert out.cost == pytest.approx(tiny_problem.evaluate(out.assignment), rel=1e-9)
+        assert out.lower_bound is None
 
     def test_rejects_nonlinear_objectives(self, tiny):
         class Squared:
@@ -84,7 +111,11 @@ class TestLimits:
 
     @pytest.mark.parametrize(
         ("params", "match"),
-        [({"default_time_limit": 0}, "default_time_limit"), ({"mip_rel_gap": -1}, "mip_rel_gap")],
+        [
+            ({"default_time_limit": 0}, "default_time_limit"),
+            ({"mip_rel_gap": -1}, "mip_rel_gap"),
+            ({"max_types": 0}, "max_types"),
+        ],
     )
     def test_validates_parameters(self, params, match):
         with pytest.raises(ValueError, match=match):
