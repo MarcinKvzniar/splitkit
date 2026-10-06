@@ -127,8 +127,9 @@ def render_report(result: SplitResult) -> Any:
         header.append("   PROVEN OPTIMAL", style="bold green")
     elif result.lower_bound is not None:
         header.append(f"   lower bound {result.lower_bound:.6g}  gap {result.gap():.2%}")
+    plural = "" if result.n_evals == 1 else "s"
     header.append(
-        f"\n{result.n_evals:,} evaluations in {result.elapsed_time:.2f}s", style="dim"
+        f"\n{result.n_evals:,} evaluation{plural} in {result.elapsed_time:.2f}s", style="dim"
     )
 
     table = Table(box=None, pad_edge=False, header_style="bold")

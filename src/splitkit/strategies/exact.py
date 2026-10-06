@@ -113,7 +113,7 @@ class ExactMILP(Strategy):
         assignment = _expand(per_type.reshape(len(types), -1), type_of.ravel())
         cost = problem.evaluate(assignment)
         lower_bound = cost if bound is None else min(float(bound), cost)
-        proved = res.status == 0 and cost - lower_bound <= 1e-9 * max(1.0, cost)
+        proved = res.status == 0 and cost - lower_bound <= 1e-6 * cost
 
         return Outcome(
             assignment=assignment,

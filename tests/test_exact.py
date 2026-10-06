@@ -96,6 +96,21 @@ class TestLimits:
         assert not out.proved_optimal
         assert out.cost == pytest.approx(tiny_problem.evaluate(out.assignment), rel=1e-9)
 
+    @pytest.mark.parametrize(("shortfall", "proved"), [(1e-7, True), (1e-3, False)])
+    def test_proof_tolerates_solver_precision_only(self, tiny_problem, monkeypatch, shortfall, proved):
+        """An optimal solve whose bound sits ~1e-7 below the recomputed cost is proven."""
+        import scipy.optimize
+
+        milp = scipy.optimize.milp
+
+        def nudged(**kwargs):
+            res = milp(**kwargs)
+            res.mip_dual_bound = res.fun * (1 - shortfall)
+            return res
+
+        monkeypatch.setattr("scipy.optimize.milp", nudged)
+        assert solve(tiny_problem).proved_optimal is proved
+
     def test_too_many_types_skips_the_solver(self, tiny_problem, monkeypatch):
         def never_called(**_):
             raise AssertionError("the MILP should not be built")
