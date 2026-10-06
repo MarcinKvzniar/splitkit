@@ -1820,29 +1820,18 @@ source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pandas", version = "3.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "rich" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.optional-dependencies]
 all = [
     { name = "matplotlib" },
-    { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "pandas", version = "3.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "rich" },
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scikit-learn", version = "1.9.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-exact = [
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-pandas = [
-    { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "pandas", version = "3.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-rich = [
-    { name = "rich" },
 ]
 sklearn = [
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -1875,16 +1864,13 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.6" },
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.6" },
     { name = "numpy", specifier = ">=1.23" },
-    { name = "pandas", marker = "extra == 'all'", specifier = ">=1.5" },
-    { name = "pandas", marker = "extra == 'pandas'", specifier = ">=1.5" },
-    { name = "rich", marker = "extra == 'all'", specifier = ">=13" },
-    { name = "rich", marker = "extra == 'rich'", specifier = ">=13" },
+    { name = "pandas", specifier = ">=1.5" },
+    { name = "rich", specifier = ">=13" },
     { name = "scikit-learn", marker = "extra == 'all'", specifier = ">=1.1" },
     { name = "scikit-learn", marker = "extra == 'sklearn'", specifier = ">=1.1" },
-    { name = "scipy", marker = "extra == 'all'", specifier = ">=1.10" },
-    { name = "scipy", marker = "extra == 'exact'", specifier = ">=1.10" },
+    { name = "scipy", specifier = ">=1.10" },
 ]
-provides-extras = ["all", "exact", "pandas", "rich", "sklearn", "viz"]
+provides-extras = ["all", "sklearn", "viz"]
 
 [package.metadata.requires-dev]
 bench = [

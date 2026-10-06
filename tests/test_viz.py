@@ -55,7 +55,6 @@ class TestConvergence:
         assert line.get_xdata()[-1] == result.n_evals
 
     def test_marks_the_lower_bound(self, tiny):
-        pytest.importorskip("scipy")
         r = split(tiny, (0.5, 0.5), strategy="exact")
         labels = [line.get_label() for line in plot_convergence(r).get_lines()]
         assert "lower bound" in labels

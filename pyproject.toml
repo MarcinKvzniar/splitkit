@@ -29,15 +29,12 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
-dependencies = ["numpy>=1.23"]
+dependencies = ["numpy>=1.23", "pandas>=1.5", "scipy>=1.10", "rich>=13"]
 
 [project.optional-dependencies]
-pandas  = ["pandas>=1.5"]
-sklearn = ["scikit-learn>=1.1"]
 viz     = ["matplotlib>=3.6"]
-exact   = ["scipy>=1.10"]
-rich    = ["rich>=13"]
-all     = ["splitkit[pandas,sklearn,viz,exact,rich]"]
+sklearn = ["scikit-learn>=1.1"]
+all     = ["splitkit[viz,sklearn]"]
 
 [project.scripts]
 splitkit = "splitkit.cli:main"
@@ -78,7 +75,7 @@ testpaths = ["tests"]
 addopts = "--strict-markers"
 markers = [
     "slow: long-running tests",
-    "exact: requires SciPy (the exact extra)",
+    "exact: exact MILP solver tests",
     "sklearn: requires scikit-learn",
 ]
 

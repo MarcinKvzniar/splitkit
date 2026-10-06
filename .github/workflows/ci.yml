@@ -22,7 +22,7 @@ jobs:
       - run: uv run mypy
 
   test-core:
-    name: test (numpy only, Python ${{ matrix.python }})
+    name: test (core install, Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

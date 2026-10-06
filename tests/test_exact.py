@@ -14,7 +14,6 @@ from splitkit.problem import Budget, SplitProblem
 from splitkit.strategies import Outcome, get_strategy
 from splitkit.strategies.exact import _expand
 
-pytest.importorskip("scipy")
 pytestmark = pytest.mark.exact
 
 

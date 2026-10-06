@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import io
-import sys
 from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from rich.console import Console
 
 from _helpers import make_dataset
 from splitkit import _console, split
@@ -38,7 +38,6 @@ class TestBudgetHook:
 
     @pytest.mark.exact
     def test_exact_fallback_forwards_the_callback(self, tiny_problem, rng, monkeypatch):
-        pytest.importorskip("scipy")
         no_solution = SimpleNamespace(x=None, status=1, mip_dual_bound=float("nan"))
         monkeypatch.setattr("scipy.optimize.milp", lambda **_: no_solution)
         with pytest.warns(RuntimeWarning):
@@ -65,46 +64,8 @@ class TestFractionDone:
         assert _console._fraction_done(budget, 50, 1.0) == expected
 
 
-def test_rich_detection(monkeypatch):
-    monkeypatch.setitem(sys.modules, "rich", None)
-    assert _console._rich_available() is False
-
-
-class TestPlainProgress:
-    @pytest.fixture(autouse=True)
-    def without_rich(self, monkeypatch):
-        monkeypatch.setattr(_console, "_rich_available", lambda: False)
-        monkeypatch.setattr(_console, "_PLAIN_REFRESH", 0.0)
-
-    @pytest.mark.parametrize("budget, percent", [(Budget(max_evals=100), True), (Budget(), False)])
-    def test_draws_a_status_line(self, capsys, budget, percent):
-        with _console.progress_display("annealing", budget) as report:
-            report(50, 0.25)
-        err = capsys.readouterr().err
-        assert err.startswith("\rannealing: ")
-        assert "50 evals  best cost 0.25" in err
-        assert ("%" in err) is percent
-        assert err.endswith("\n")
-
-    def test_throttles_and_stays_silent_when_never_drawn(self, capsys, monkeypatch):
-        monkeypatch.setattr(_console, "_PLAIN_REFRESH", 3600.0)
-        with _console.progress_display("annealing", Budget(max_evals=100)) as report:
-            report(50, 0.25)
-        assert capsys.readouterr().err == ""
-
-    def test_report_falls_back_to_summary(self, capsys, tiny):
-        _console.print_report(split(tiny, max_evals=500, seed=0))
-        assert "Worst class balance" in capsys.readouterr().err
-
-
-class TestRich:
-    @pytest.fixture(autouse=True)
-    def rich(self):
-        return pytest.importorskip("rich")
-
+class TestReport:
     def render(self, result) -> str:
-        from rich.console import Console
-
         console = Console(record=True, width=120, file=io.StringIO())
         console.print(result)
         return console.export_text()

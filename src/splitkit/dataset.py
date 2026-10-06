@@ -5,26 +5,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+import pandas as pd
 from numpy.typing import ArrayLike
 
-if TYPE_CHECKING:  # pragma: no cover
-    import pandas as pd
-
 __all__ = ["GroupedDataset"]
-
-
-def _require_pandas() -> Any:
-    try:
-        import pandas as pd
-    except ImportError as exc:  # pragma: no cover
-        raise ImportError(
-            "Building a dataset from a DataFrame requires pandas. "
-            "Install it with: pip install 'splitkit[pandas]'"
-        ) from exc
-    return pd
 
 
 def _factorize(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -318,7 +305,6 @@ class GroupedDataset:
             Columns that already hold per-class counts; ``size_col`` gives the
             number of items a row stands for.
         """
-        pd = _require_pandas()
         if not isinstance(df, pd.DataFrame):
             raise TypeError(f"Expected a pandas DataFrame, got {type(df).__name__}.")
 

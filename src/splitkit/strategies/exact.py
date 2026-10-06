@@ -39,7 +39,6 @@ class ExactMILP(Strategy):
 
     name = "exact"
     deterministic = True
-    requires = ("exact",)
 
     def __init__(
         self,
@@ -64,13 +63,7 @@ class ExactMILP(Strategy):
         rng: np.random.Generator,
         warm_start: np.ndarray | None = None,
     ) -> Outcome:
-        try:
-            from scipy.optimize import milp
-        except ImportError as exc:  # pragma: no cover
-            raise ImportError(
-                "The exact strategy requires SciPy. "
-                "Install it with: pip install 'splitkit[exact]'"
-            ) from exc
+        from scipy.optimize import milp
 
         prepared = problem.prepared
         if not isinstance(prepared, LinearObjective):

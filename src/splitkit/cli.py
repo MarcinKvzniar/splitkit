@@ -8,10 +8,11 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+import pandas as pd
+
 from . import __version__
 from ._console import print_report
 from .api import split
-from .dataset import _require_pandas
 from .strategies import list_strategies
 
 
@@ -72,7 +73,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("one of --label-col, --label-cols or --count-cols is required")
 
     try:
-        pd = _require_pandas()
         text = sys.stdin.read() if args.input == "-" else Path(args.input).read_text("utf-8-sig")
         sep = "\t" if args.input.endswith(".tsv") else ","
         # Keys and labels stay text, so IDs like "007" and "7" remain distinct.

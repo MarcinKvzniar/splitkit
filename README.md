@@ -15,58 +15,135 @@ directly.
 - Single-label, multi-label, and count data (such as pixel counts per class).
 - A quality report on every split, and a proven optimum for problems up to a few
   thousand distinct groups.
-- Only numpy is required.
+- Works on DataFrames, plain arrays, or CSV files from the command line.
 
 ## Install
 
 ```bash
-pip install splitkit                 # numpy only
-pip install 'splitkit[pandas]'       # DataFrame input and the command line
-pip install 'splitkit[all]'          # plus exact solver (SciPy), plots, rich output, SGKF baseline
+pip install splitkit
 ```
+
+This covers everything except two optional extras:
+
+| extra | adds | for |
+|---|---|---|
+| `splitkit[viz]` | matplotlib | `splitkit.viz` plots |
+| `splitkit[sklearn]` | scikit-learn | the `sgkf` baseline strategy |
+| `splitkit[all]` | both | |
 
 ## Quickstart
 
 ```python
+import numpy as np
+import pandas as pd
+
 import splitkit
 
+# Example data: 2,000 images from 300 patients; melanoma is rare.
+rng = np.random.default_rng(0)
+df = pd.DataFrame({
+    "image": [f"img_{i:04d}.jpg" for i in range(2_000)],
+    "patient_id": rng.integers(0, 300, 2_000),
+    "diagnosis": rng.choice(["benign", "nevus", "melanoma"], 2_000, p=[0.80, 0.15, 0.05]),
+})
+
 result = splitkit.split(df, group_col="patient_id", label_col="diagnosis", seed=0)
+print(result.summary())
 
 train, val, test = result.indices.astuple()     # row positions into df
-df_train = df.iloc[train]
-print(result.summary())
+df_train, df_val, df_test = df.iloc[train], df.iloc[val], df.iloc[test]
 ```
 
 ```text
 ====================================================================
 Split: dataset  (3 splits, 299 groups, 3 classes)
 Strategy: annealing   cost: 0.0917532
-Evaluations: 300,000   time: 1.33s
+Evaluations: 300,000   time: 1.34s
 --------------------------------------------------------------------
 split           groups       items   requested    achieved
-train              194       1,400      70.0%       70.0%
-val                 54         300      15.0%       15.0%
+train              197       1,400      70.0%       70.0%
+val                 51         300      15.0%       15.0%
 test                51         300      15.0%       15.0%
 --------------------------------------------------------------------
 Worst class balance: 'melanoma' in 'val' off target by 1.6%
 ====================================================================
 ```
 
-Other input forms:
+For your own data, replace the example `df` with your table. The next section
+explains what it needs.
+
+## Preparing your data
+
+splitkit never reads your images or files. It needs a table with **one row per item**
+(an image, a tile, a visit) and two kinds of columns:
+
+- **A group column**: the unit that must stay whole, such as a patient, slide or
+  case. Choose it carefully. If one patient appears under two IDs (for example the
+  folders `case7_0` and `case7_1`), map both to one ID first, or that patient can
+  leak across splits.
+- **Labels**, in one of three forms:
+
+| your labels | argument | example |
+|---|---|---|
+| one class per item | `label_col="diagnosis"` | classification |
+| several 0/1 (or -1/1) indicators per item | `label_cols=["smiling", "male"]` | multi-label attributes |
+| an amount of each class per item | `count_cols=["tumor", "stroma"]` | pixel counts from segmentation masks |
 
 ```python
-splitkit.split(groups=patient_ids, y=labels)                       # plain arrays
-splitkit.split(df, group_col="identity", label_cols=attributes)   # multi-label indicators
-splitkit.split(df, group_col="slide", count_cols=pixel_counts)    # per-class counts
+splitkit.split(df, group_col="identity", label_cols=attributes)
+splitkit.split(df, group_col="slide", count_cols=["tumor", "stroma"])
+splitkit.split(groups=patient_ids, y=labels)                  # plain arrays, no DataFrame
 splitkit.split(df, {"train": 0.8, "test": 0.2}, group_col=..., label_col=...)
 ```
+
+Group IDs and labels must not be missing; drop or fill those rows first. Other
+columns, such as file paths, are carried along untouched.
+
+### Segmentation masks
+
+Count the pixels of each class in every mask, then split on those counts. Each class
+then gets the same share of its pixels in every split, so every split keeps the
+overall class proportions. This example reads RGB masks stored as
+`masks/<case>/<tile>.png` (it needs Pillow):
+
+```python
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from PIL import Image
+
+import splitkit
+
+PALETTE = {"background": (0, 0, 0), "healthy": (66, 135, 245), "cancer": (245, 66, 66)}
+colours = np.array(list(PALETTE.values()))
+
+rows = []
+for path in sorted(Path("masks").glob("*/*.png")):
+    pixels = np.asarray(Image.open(path).convert("RGB")).reshape(-1, 3).astype(int)
+    nearest = ((pixels[:, None] - colours) ** 2).sum(axis=2).argmin(axis=1)
+    counts = np.bincount(nearest, minlength=len(colours))
+    rows.append({"case": path.parent.name, "mask": str(path), **dict(zip(PALETTE, counts))})
+df = pd.DataFrame(rows)
+
+result = splitkit.split(df, group_col="case", count_cols=["healthy", "cancer"])
+df = result.assign_column(df, "case")       # adds a "split" column next to each path
+```
+
+Matching each pixel to the nearest palette colour also handles blended colours at
+region edges, which resized masks often have. For masks that store class indices
+(0, 1, 2, ...) instead of colours, use
+`np.bincount(np.asarray(Image.open(path)).ravel(), minlength=n_classes)`. Leave
+background out of `count_cols` unless its share matters to you.
+
+## Working with the result
 
 `result.groups` gives group ids per split, `result.assign_column(df, "patient_id")`
 adds a split column, and `splitkit.evaluate(dataset, assignment)` scores a split
 made elsewhere on the same objective.
 
-Pass `progress=True` for a live progress bar. With `pip install 'splitkit[rich]'` it is
-styled, and `rich.print(result)` prints the report as a formatted panel.
+Pass `progress=True` for a live progress bar, and use `rich.print(result)` to print
+the report as a formatted panel.
 
 ## Command line
 
@@ -83,9 +160,9 @@ progress bar and then the quality report on stderr; `-q` silences both. Run
 | strategy | when to use it |
 |---|---|
 | `annealing` (default) | Any size. Simulated annealing whose schedule adapts to the budget. |
-| `exact` | Up to a few thousand *distinct* groups, with `pip install 'splitkit[exact]'`. Mixed-integer programming via HiGHS: a proven optimum, or the best split found plus a lower bound when time runs out. Identical groups are merged, so 70k single-visit patients may be only a few hundred types. Above 10,000 types it warns and uses annealing. |
+| `exact` | Up to a few thousand *distinct* groups. Mixed-integer programming via HiGHS: a proven optimum, or the best split found plus a lower bound when time runs out. Identical groups are merged, so 70k single-visit patients may be only a few hundred types. Above 10,000 types it warns and uses annealing. |
 | `evolution` | Very large datasets, when minutes are acceptable. Differential evolution; it was best on CelebA's 10k groups. |
-| `random`, `sgkf` | Baselines: random search and scikit-learn's `StratifiedGroupKFold`. |
+| `random`, `sgkf` | Baselines: random search and scikit-learn's `StratifiedGroupKFold` (`sgkf` needs `splitkit[sklearn]`). |
 
 ```python
 splitkit.split(df, ..., strategy="exact", time_budget=30)

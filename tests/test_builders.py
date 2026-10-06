@@ -9,11 +9,10 @@ cannot tell you which rows to actually train on.
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from splitkit.dataset import GroupedDataset
-
-pd = pytest.importorskip("pandas")
 
 
 class TestFromCounts:

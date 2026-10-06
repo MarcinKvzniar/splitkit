@@ -1,36 +1,30 @@
-"""Terminal output: a live progress display and a styled report, via rich if installed."""
+"""Terminal output: a live progress display and a styled report."""
 
 from __future__ import annotations
 
-import sys
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
+from rich.table import Table
+from rich.text import Text
 
 if TYPE_CHECKING:  # pragma: no cover
     from .problem import Budget
     from .result import SplitResult
 
 ProgressCallback = Callable[[int, float], None]
-
-_PLAIN_REFRESH = 0.1  # seconds between plain-text redraws
-
-
-def _rich_available() -> bool:
-    try:
-        import rich  # noqa: F401
-    except ImportError:
-        return False
-    return True
-
-
-@contextmanager
-def progress_display(strategy: str, budget: Budget) -> Iterator[ProgressCallback]:
-    """Yield a ``(n_evals, best_cost)`` callback that draws progress on stderr."""
-    display = _rich_progress if _rich_available() else _plain_progress
-    with display(strategy, budget) as report:
-        yield report
 
 
 def _fraction_done(budget: Budget, n_evals: int, elapsed: float) -> float | None:
@@ -42,17 +36,8 @@ def _fraction_done(budget: Budget, n_evals: int, elapsed: float) -> float | None
 
 
 @contextmanager
-def _rich_progress(strategy: str, budget: Budget) -> Iterator[ProgressCallback]:
-    from rich.console import Console
-    from rich.progress import (
-        BarColumn,
-        Progress,
-        SpinnerColumn,
-        TaskProgressColumn,
-        TextColumn,
-        TimeElapsedColumn,
-    )
-
+def progress_display(strategy: str, budget: Budget) -> Iterator[ProgressCallback]:
+    """Yield a ``(n_evals, best_cost)`` callback that draws progress on stderr."""
     progress = Progress(
         SpinnerColumn(),
         TextColumn("[bold]{task.description}"),
@@ -76,49 +61,13 @@ def _rich_progress(strategy: str, budget: Budget) -> Iterator[ProgressCallback]:
         yield report
 
 
-@contextmanager
-def _plain_progress(strategy: str, budget: Budget) -> Iterator[ProgressCallback]:
-    t_start = last_draw = time.perf_counter()
-    drawn = False
-
-    def report(n_evals: int, best_cost: float) -> None:
-        nonlocal last_draw, drawn
-        now = time.perf_counter()
-        if now - last_draw < _PLAIN_REFRESH:
-            return
-        last_draw, drawn = now, True
-        done = _fraction_done(budget, n_evals, now - t_start)
-        percent = "" if done is None else f"{done:4.0%}  "
-        sys.stderr.write(
-            f"\r{strategy}: {percent}{n_evals:,} evals  best cost {best_cost:.4g}  "
-            f"{now - t_start:.1f}s"
-        )
-        sys.stderr.flush()
-
-    try:
-        yield report
-    finally:
-        if drawn:
-            sys.stderr.write("\n")
-
-
 def print_report(result: SplitResult) -> None:
-    """Print the quality report to stderr, styled when rich is installed."""
-    if _rich_available():
-        from rich.console import Console
-
-        Console(stderr=True).print(result)
-    else:
-        print(result.summary(), file=sys.stderr)
+    """Print the styled quality report to stderr."""
+    Console(stderr=True).print(result)
 
 
-def render_report(result: SplitResult) -> Any:
+def render_report(result: SplitResult) -> Panel:
     """The quality report as a rich renderable."""
-    from rich.console import Group
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.text import Text
-
     header = Text.assemble(
         ("Strategy ", "dim"), (result.strategy, "bold"),
         ("   cost ", "dim"), (f"{result.cost:.6g}", "bold cyan"),

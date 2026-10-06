@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 
 import splitkit
 from _helpers import make_dataset
 from splitkit import GroupedDataset, SplitResult, evaluate, split
-
-pd = pytest.importorskip("pandas")
 
 
 @pytest.fixture

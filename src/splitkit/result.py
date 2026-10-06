@@ -5,14 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from .dataset import GroupedDataset
-
-if TYPE_CHECKING:  # pragma: no cover
-    import pandas as pd
 
 __all__ = ["SplitMapping", "SplitResult"]
 
@@ -169,7 +167,6 @@ class SplitResult:
 
     def to_frame(self) -> pd.DataFrame:
         """One row per group: id, split, size and per-class counts."""
-        pd = _require_pandas()
         frame = pd.DataFrame(
             {
                 "group_id": self.dataset.group_ids,
@@ -183,7 +180,6 @@ class SplitResult:
 
     def counts_frame(self) -> pd.DataFrame:
         """Target vs actual per (split, class), with the relative error."""
-        pd = _require_pandas()
         class_names = self._column_names()
         rows = []
         for s, name in enumerate(self.names):
@@ -207,7 +203,6 @@ class SplitResult:
         inplace: bool = False,
     ) -> pd.DataFrame:
         """Label each row of ``df`` with the split its group landed in."""
-        _require_pandas()
         mapping: dict[str, str] = {}
         for s, name in enumerate(self.names):
             for gid in self.dataset.group_ids[self.assignment == s]:
@@ -313,14 +308,3 @@ class SplitResult:
 def _shorten(names: tuple[str, ...], limit: int = 5) -> str:
     more = f" (+{len(names) - limit} more)" if len(names) > limit else ""
     return ", ".join(names[:limit]) + more
-
-
-def _require_pandas() -> Any:
-    try:
-        import pandas as pd
-    except ImportError as exc:  # pragma: no cover
-        raise ImportError(
-            "This method requires pandas. "
-            "Install it with: pip install 'splitkit[pandas]'"
-        ) from exc
-    return pd

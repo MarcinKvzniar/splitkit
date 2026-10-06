@@ -21,17 +21,18 @@ Initial release.
   report (`.summary()`), including classes too rare to stratify.
 - `splitkit.evaluate()` to score a split made elsewhere on the same objective.
 - Strategies: simulated annealing (default), an exact MILP solver that reports a
-  proven optimum or lower bound (`[exact]` extra), differential evolution for
-  very large datasets, and random search and `StratifiedGroupKFold` baselines.
+  proven optimum or lower bound, differential evolution for very large datasets,
+  and random search and `StratifiedGroupKFold` (`[sklearn]` extra) baselines.
 - Budgets by evaluation count or wall-clock time, and reproducible results
   with `seed=`.
-- `splitkit` command line for CSV/TSV files (`[pandas]` extra).
+- `splitkit` command line for CSV/TSV files.
 - `splitkit.viz` plots of per-class allocation and convergence (`[viz]` extra).
 - A live progress bar (`progress=True`, on by default in the command line) and a
-  styled report via `rich.print(result)` (`[rich]` extra, with a plain-text fallback).
+  styled report via `rich.print(result)`.
 - `GroupedDataset` builders, pickle-free `.npz` I/O, and synthetic datasets for
   experiments.
-- numpy is the only required dependency. Python 3.10–3.14, fully typed.
+- Requires numpy, pandas, SciPy and rich; plots and the SGKF baseline are
+  optional (`[all]`). Python 3.10–3.14, fully typed.
 
 [Unreleased]: https://github.com/MarcinKvzniar/splitkit/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/MarcinKvzniar/splitkit/releases/tag/v0.1.0

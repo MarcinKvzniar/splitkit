@@ -7,11 +7,10 @@ import runpy
 import sys
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from splitkit.cli import main
-
-pd = pytest.importorskip("pandas")
 
 FAST = ["--max-evals", "2000", "--seed", "0"]
 
