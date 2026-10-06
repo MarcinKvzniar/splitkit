@@ -160,12 +160,17 @@ def plot_convergence(name: str, results: dict, outdir: str):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    names = args if args else list(_DATASET_PATHS.keys())
+    built = [n for n, p in _DATASET_PATHS.items() if os.path.exists(p)]
+    names = args if args else built
+    if not args and len(built) < len(_DATASET_PATHS):
+        print(f"Skipping datasets not built locally: {sorted(set(_DATASET_PATHS) - set(built))}")
 
     # Validate datasets
     for n in names:
         if n not in _DATASET_PATHS:
             sys.exit(f"Error: Unknown dataset '{n}'. Valid options: {list(_DATASET_PATHS.keys())}")
+        if n not in built:
+            sys.exit(f"Error: {_DATASET_PATHS[n]} not found; see benchmarks/README.md to build it.")
 
     os.makedirs("results", exist_ok=True)
     summary_rows = []

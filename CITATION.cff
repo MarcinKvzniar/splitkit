@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use splitkit in your research, please cite it as below."
+title: "splitkit: leakage-free, class-balanced splits of grouped data"
+type: software
+authors:
+  - family-names: "Kuźniar"
+    given-names: "Marcin"
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/MarcinKvzniar/splitkit"
+abstract: >-
+  splitkit splits grouped datasets (several images per patient, tiles per slide)
+  into train, validation and test sets without group leakage, while matching the
+  class distribution in every split. It treats the split as an optimisation
+  problem and solves it with simulated annealing, differential evolution, or exact
+  mixed-integer programming.
+keywords:
+  - machine learning
+  - data splitting
+  - stratification
+  - group leakage
+  - medical imaging

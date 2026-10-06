@@ -215,6 +215,17 @@ minutes rather than seconds.
 Details, datasets and how to reproduce them are in
 [`benchmarks/`](https://github.com/MarcinKvzniar/splitkit/tree/main/benchmarks).
 
+## Citing
+
+If splitkit helps your research, please cite it; GitHub's "Cite this repository"
+button gives the reference. If you use `strategy="exact"`, please also cite the HiGHS
+solver it runs on:
+
+> Q. Huangfu and J. A. J. Hall. Parallelizing the dual revised simplex method.
+> *Mathematical Programming Computation* 10(1):119–142, 2018.
+> [doi:10.1007/s12532-017-0130-5](https://doi.org/10.1007/s12532-017-0130-5)
+
 ## License
 
-MIT
+MIT. The benchmark data files keep their sources' licenses; see
+[`benchmarks/`](https://github.com/MarcinKvzniar/splitkit/tree/main/benchmarks).

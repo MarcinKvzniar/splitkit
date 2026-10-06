@@ -12,8 +12,9 @@ datasets/isic2020/train.csv
 results/
 
 !datasets/bcss/preprocessed/
-!datasets/celeb-faces/preprocessed/
 !datasets/isic2020/preprocessed/
+# CelebA's terms forbid redistributing derived data; build it locally (benchmarks/README.md).
+datasets/celeb-faces/preprocessed/
 
 __pycache__/
 *.py[cod]
