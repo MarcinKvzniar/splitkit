@@ -115,7 +115,7 @@ def split(
     seed
         Makes the result reproducible.
     progress
-        Show a live progress bar on stderr (styled if ``rich`` is installed).
+        Show a live progress bar on stderr.
 
     See :meth:`SplitProblem.build` for the objective options.
 

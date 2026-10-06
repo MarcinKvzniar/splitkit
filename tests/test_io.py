@@ -95,7 +95,7 @@ class TestFileHandling:
 
 class TestPickleFree:
     def test_loads_without_allow_pickle(self, tiny, tmp_path):
-        """The whole point of the format: no code execution on load."""
+        """Loading a file must never execute code."""
         path = save_npz(tiny, tmp_path / "d.npz")
         with np.load(path, allow_pickle=False) as z:
             assert set(z.files) >= {

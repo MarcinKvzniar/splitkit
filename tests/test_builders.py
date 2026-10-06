@@ -1,9 +1,8 @@
 """Dataset builders.
 
-The builders are what make splitkit usable outside the benchmark suite: a user
-arrives with a DataFrame or a pair of arrays, not a count matrix. They are also
-where item provenance is captured, without which a split can name groups but
-cannot tell you which rows to actually train on.
+Users start from a DataFrame or a pair of arrays, not a count matrix. The builders
+also record which group each item belongs to, which is what lets a split return
+row indices rather than only group ids.
 """
 
 from __future__ import annotations
@@ -365,8 +364,8 @@ class TestEndToEnd:
             problem, Budget(max_evals=2000), np.random.default_rng(0)
         )
 
-        # THE guarantee: every item of a group lands in the same split, so no
-        # group leaks across the train/val/test boundary.
+        # Every item of a group lands in the same split, so no group crosses the
+        # train/val/test boundary.
         item_split = out.assignment[d.item_group_index]
         for g in range(d.n_groups):
             rows = item_split[d.item_group_index == g]

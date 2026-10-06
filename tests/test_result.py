@@ -94,8 +94,8 @@ class TestEmptySplitHandling:
     def test_achieved_ratios_with_no_items(self):
         """Zero total size must not divide by zero.
 
-        Unreachable through split() -- a dataset with no mass is rejected earlier --
-        so the guard is exercised on the result type directly.
+        split() rejects a dataset with no mass earlier, so the guard is tested on
+        the result type directly.
         """
         from splitkit.result import SplitResult
 

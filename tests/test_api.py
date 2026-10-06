@@ -104,7 +104,7 @@ class TestGuarantees:
         assert len(np.unique(seen)) == result.dataset.n_groups
 
     def test_no_group_leaks_across_splits(self, result):
-        """The core promise: related items never straddle a split boundary."""
+        """Items of one group never land in different splits."""
         item_split = result.assignment[result.dataset.item_group_index]
         for g in range(result.dataset.n_groups):
             rows = item_split[result.dataset.item_group_index == g]
@@ -142,7 +142,7 @@ class TestGuarantees:
 
 class TestSplitMapping:
     def test_astuple_gives_arrays_not_keys(self, result):
-        """A dict would unpack to its keys; this is why astuple exists."""
+        """Unpacking a mapping yields its keys, so astuple returns the arrays."""
         train, val, test = result.indices.astuple()
         for part in (train, val, test):
             assert isinstance(part, np.ndarray)
@@ -182,7 +182,7 @@ class TestItemAccess:
             )
 
     def test_aggregated_data_explains_the_limitation(self, tiny):
-        """Count-only datasets cannot produce item indices; say so precisely."""
+        """Count-only datasets cannot produce item indices; the error says why."""
         r = split(tiny, (0.5, 0.5), max_evals=500, seed=0)
         assert not tiny.has_items
         with pytest.raises(ValueError, match="aggregated counts"):
@@ -270,7 +270,7 @@ class TestEvaluate:
         )
 
     def test_lets_you_compare_against_another_splitter(self, tiny):
-        """The point of a public evaluate(): compare on equal terms."""
+        """evaluate() scores an external split on the same objective as split()."""
         ours = split(tiny, (0.5, 0.25, 0.25), max_evals=2000, seed=0)
         naive = np.array([0, 1, 2, 0, 1, 2])
         assert ours.cost <= evaluate(tiny, naive, (0.5, 0.25, 0.25))

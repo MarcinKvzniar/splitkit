@@ -59,10 +59,7 @@ class TestWeightedMAPE:
             )
 
     def test_row_matches_rows(self):
-        """Single-split cost must agree with the vectorised per-split costs.
-
-        This is the property the O(C) move evaluation depends on.
-        """
+        """Single-split cost must agree with the vectorised per-split costs."""
         rng = np.random.default_rng(1)
         target = rng.uniform(1, 50, size=(3, 5))
         weights = rng.uniform(0.1, 2, size=5)

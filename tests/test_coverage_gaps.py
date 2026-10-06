@@ -1,8 +1,7 @@
 """Paths that only trigger on larger inputs or non-default configuration.
 
-Each of these is reachable in real use -- the tuned DE variant, the large-problem
-count path, the SGKF downscale -- but not on the small fixtures the rest of the
-suite uses, so they need to be reached deliberately.
+Each is reachable in real use (the tuned DE variant, the large-problem count path,
+the SGKF downscale) but not on the small fixtures the rest of the suite uses.
 """
 
 from __future__ import annotations

@@ -153,8 +153,8 @@ class SimulatedAnnealing(Strategy):
             new_cost = total(counts)
 
             delta = new_cost - cost
-            # rng.random() is drawn only for uphill moves; the short-circuit is
-            # load-bearing for reproducibility.
+            # rng.random() is drawn only for uphill moves. Changing that would change
+            # every seeded result, so keep the short-circuit.
             if delta < 0 or rng.random() < math.exp(-delta / max(temp, 1e-300)):
                 assignment[g] = new_s
                 cost = new_cost

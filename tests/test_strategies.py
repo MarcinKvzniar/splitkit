@@ -132,10 +132,9 @@ class TestSearchQuality:
     def searchable(self) -> SplitProblem:
         """Large enough that sampling cannot cover it, with budget to search it.
 
-        The claim "directed beats random" is only well posed in that regime: on a
-        10-group instance the whole space fits in a few thousand draws, and with
-        only a handful of moves per group a local search has not organised
-        anything yet.
+        On a 10-group instance random sampling covers the whole space in a few
+        thousand draws, and with only a few moves per group a local search has
+        barely started, so neither would show a real difference.
         """
         rng = np.random.default_rng(1)
         data = make_dataset(rng.integers(1, 30, size=(100, 6)).astype(float))
@@ -151,7 +150,7 @@ class TestSearchQuality:
         assert directed.cost < undirected.cost
 
     def test_annealing_margin_is_substantial(self, searchable):
-        """Not merely better -- decisively so, or the search is not earning its cost."""
+        """Annealing beats random search by a wide margin, not just slightly."""
         budget = Budget(max_evals=8000)
         sa = get_strategy("annealing").run(searchable, budget, np.random.default_rng(0))
         rs = get_strategy("random").run(searchable, budget, np.random.default_rng(0))

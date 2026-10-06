@@ -1,9 +1,8 @@
 """Ground truth from exhaustive enumeration.
 
-On instances small enough to enumerate every assignment, the optimum is not a
-matter of opinion. These tests use that to check the objective actually ranks
-splits the way the problem statement claims, and to give later work (the exact
-solver, greedy) something incontestable to be measured against.
+On instances small enough to enumerate every assignment, the true optimum is
+known. These tests check that the objective ranks splits as intended and give the
+strategies an exact reference to be measured against.
 """
 
 from __future__ import annotations
@@ -89,7 +88,7 @@ class TestObjectiveRanksSplitsCorrectly:
 class TestStrategiesAgainstOracle:
     @pytest.mark.parametrize("name", ["annealing", "evolution", "random"])
     def test_never_beats_the_optimum(self, name):
-        """A strategy reporting a cost below the true optimum is reporting a lie."""
+        """No strategy may report a cost below the true optimum."""
         from splitkit.problem import Budget
         from splitkit.strategies import get_strategy
 
